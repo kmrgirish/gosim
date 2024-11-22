@@ -35,3 +35,9 @@ func TestMachineHostname(t *testing.T) {
 
 	m.Wait()
 }
+
+func TestGetpagesize(t *testing.T) {
+	if pgsize := os.Getpagesize(); pgsize != 4096 {
+		t.Fatalf("bad page size %d", pgsize)
+	}
+}

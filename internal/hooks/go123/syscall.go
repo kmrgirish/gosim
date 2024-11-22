@@ -36,7 +36,8 @@ func Syscall_hasWaitingReaders(rw *sync.RWMutex) bool {
 }
 
 func Syscall_Getpagesize() int {
-	panic("gosim not implemented")
+	// TODO: support bigger pages optionally? flip per architecture?
+	return 4096
 }
 
 func Syscall_Exit(code int) {
