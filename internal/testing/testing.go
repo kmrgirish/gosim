@@ -58,7 +58,7 @@ func highPrecisionTimeSince(b highPrecisionTime) time.Duration {
 
 // fmtDuration returns a string representing d in the form "87.00s".
 func fmtDuration(d time.Duration) string {
-	return fmt.Sprintf("%.2fs", d.Seconds())
+	return fmt.Sprintf("%.2fs simulated", d.Seconds())
 }
 
 type TB interface {

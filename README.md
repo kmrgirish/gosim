@@ -51,7 +51,7 @@ func TestGosim(t *testing.T) {
 > go test -v -run TestGosim
 === RUN   TestGosim
     simple_test.go:10: Are we in the Matrix? false
---- PASS: TestGosim (0.00s)
+--- PASS: TestGosim (0.00s simulated)
 PASS
 ok  	example	0.216s
 ```
@@ -124,7 +124,7 @@ func request() {
 
 func TestMachines(t *testing.T) {
 	// run the server
-	serverMachine := gosim.NewMachine(gosim.MachineOpts{
+	serverMachine := gosim.NewMachine(gosim.MachineConfig{
 		Label:    "server",
 		Addr:     netip.MustParseAddr("10.0.0.1"),
 		MainFunc: server,
@@ -178,7 +178,7 @@ what happens this test is run:
    14 main/4     14:10:05.000 INF example/machines_test.go:27 > making a request
    15 server/16  14:10:06.000 INF example/machines_test.go:20 > got a request from 11.0.0.1:10001
    16 main/4     14:10:07.000 INF example/machines_test.go:41 > hello from the server! request: 2
---- PASS: TestMachines (4.00s)
+--- PASS: TestMachines (4.00s simulated)
 ok  	translated/example	0.237s
 ```
 In the log, each line is annotated with the machine and goroutine that wrote
