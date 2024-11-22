@@ -25,7 +25,7 @@ test' command:
 	go run github.com/jellevandenhooff/gosim/cmd/gosim test -run TestName -v ./path/to/pkg
 
 For more information on the 'gosim' command see its documentation at
-[github.com/jellevandenhooff/gosim/cmd/gosim].  To run Gosim tests from with a
+[github.com/jellevandenhooff/gosim/cmd/gosim].  To run Gosim tests from within a
 Go test, use the
 [github.com/jellevandenhooff/gosim/metatesting] package.
 
@@ -60,6 +60,7 @@ manipulate the network.
 
 # Gosim internals
 
-For a description of how Gosim works, see the design in docs/design.MD.
+For a description of how Gosim works, see the design in
+https://github.com/jellevandenhooff/gosim/blob/main/docs/design.md
 */
 package gosim
