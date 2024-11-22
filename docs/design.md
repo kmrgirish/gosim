@@ -515,9 +515,8 @@ PCT algorithm originally described in
 
 ## Testing filesystem code
 
-Gosim's filesystem simulation with fine-grained fsync support is reminsicent 
-of  
-[Alice (Application-Level Intelligent Crash Explorer)](https://www.usenix.org/system/files/conference/osdi14/osdi14-paper-pillai.pdf).
+Gosim's filesystem simulation with fine-grained fsync support is reminiscent
+of [Alice (Application-Level Intelligent Crash Explorer)](https://www.usenix.org/system/files/conference/osdi14/osdi14-paper-pillai.pdf).
 Like Alice, Gosim's filesystem splits file system system calls into smaller
 operations that can individually be persisted or lost on crash, and can test
 that an application can handle those scenarios.
