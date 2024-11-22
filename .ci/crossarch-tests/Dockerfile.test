@@ -1,0 +1,13 @@
+# XXX: parametrize somehow?
+FROM golang:1.23
+
+ENV GOCACHE=/cache/GOCACHE GOMODCACHE=/cache/GOMODCACHE GOSIMCACHE=/cache/GOSIMCACHE
+
+WORKDIR /go/src/
+COPY . /go/src/
+
+# clean up .gosim/ if copied
+RUN rm -rf .gosim/
+
+# run with limited concurrency to limit memory usage
+CMD ./test.sh --concurrency 1
