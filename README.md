@@ -74,7 +74,7 @@ If running gosim fails with errors about missing `go.sum` entries, run
 
 ## Simulation
 Tests running in Gosim run inside Gosim's simulation environment. In the
-simulation tests can create simulated machines that can talk to eachother
+simulation, tests can create simulated machines that can talk to each other
 over a simulated network, crash and restart machine, introduce latency,
 and more. The following longer example shows some of those features:
 ```go
