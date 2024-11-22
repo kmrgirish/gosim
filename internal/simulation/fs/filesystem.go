@@ -9,9 +9,20 @@ import (
 	"slices"
 	"sync"
 	"syscall"
+	"unsafe"
 
 	"github.com/jellevandenhooff/gosim/internal/simulation/syscallabi"
 )
+
+// A Mmap tracks an open mmap for a given file. Mmaps are implemented by keeping
+// a slice around with the contents of the file.
+//
+// Only read-only mmaps are supported since we do not get notified on writes.
+// That is enough to make go.etcd.io/bbolt work.
+type Mmap struct {
+	Inode int
+	Data  syscallabi.ByteSliceView
+}
 
 // next:
 // - delete on test end, somehow (but pool isn't shared between tests? maybe we could/should make it?)
@@ -27,6 +38,10 @@ type backingFile struct {
 	file  *chunkedFile
 
 	linkCount int
+
+	mmaps []*Mmap // open mmaps for this file
+	// TODO: this is used both for the persisted and in-memory
+	// file but it does not make sense for persisted files?
 }
 
 var zeroes = make([]byte, 1024)
@@ -45,11 +60,33 @@ func (f *backingFile) len() int {
 }
 
 func (f *backingFile) resize(size int) {
+	oldSize := f.file.size
 	f.file.Resize(size)
+
+	// update mmaps
+	for _, mmap := range f.mmaps {
+		if size < oldSize && size <= mmap.Data.Len() {
+			// Shrink and zero bytes that have been truncated.
+			// When growing the file this is not necessary as
+			// the default is zeroes.
+			tail := mmap.Data.Slice(size, min(mmap.Data.Len(), oldSize))
+			for tail.Len() > 0 {
+				n := tail.Write(zeroes)
+				tail = tail.SliceFrom(n)
+			}
+		}
+	}
 }
 
 func (f *backingFile) write(pos int, size int, chunks []*refCountedChunk) {
 	f.file.Write(pos, size, chunks)
+
+	// update mmaps
+	for _, mmap := range f.mmaps {
+		if pos < mmap.Data.Len() {
+			f.read(int64(pos), mmap.Data.Slice(pos, min(pos+size, mmap.Data.Len())))
+		}
+	}
 }
 
 func (f *backingFile) clone() *backingFile {
@@ -631,13 +668,14 @@ func (fs *Filesystem) Mkdir(name string) error {
 type StatResp struct {
 	Inode int
 	IsDir bool
+	Size  int64
 }
 
 // XXX: these two stats should share implementation
 
 func (fs *Filesystem) statLocked(inode int) (StatResp, error) {
 	obj := fs.mem.objects[inode]
-	switch obj.(type) {
+	switch obj := obj.(type) {
 	case *backingDir:
 		return StatResp{
 			Inode: inode,
@@ -648,6 +686,7 @@ func (fs *Filesystem) statLocked(inode int) (StatResp, error) {
 		return StatResp{
 			Inode: inode,
 			IsDir: false,
+			Size:  int64(obj.file.size),
 		}, nil
 
 	default:
@@ -848,4 +887,37 @@ func (fs *Filesystem) GetInodeInfo(inode int) InodeInfo {
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 	return fs.getInodeInfoLocked(inode)
+}
+
+// Open a mmap for the given inode. Mmap starts at offset 0.
+func (fs *Filesystem) Mmap(inode int, len int) *Mmap {
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+
+	backingArray := make([]byte, len)
+	byteView := syscallabi.NewSliceView(unsafe.SliceData(backingArray), uintptr(len))
+
+	file := fs.mem.getFile(inode)
+	file.read(0, byteView)
+
+	m := &Mmap{
+		Data:  byteView,
+		Inode: inode,
+	}
+
+	file.mmaps = append(file.mmaps, m)
+	return m
+}
+
+// Close the given mmap.
+func (fs *Filesystem) Munmap(m *Mmap) {
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+
+	file := fs.mem.getFile(m.Inode)
+	idx := slices.Index(file.mmaps, m)
+	if idx == -1 {
+		panic("not found")
+	}
+	file.mmaps = slices.Delete(file.mmaps, idx, idx+1)
 }

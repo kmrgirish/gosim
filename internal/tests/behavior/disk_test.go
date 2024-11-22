@@ -2,14 +2,17 @@ package behavior_test
 
 import (
 	"bytes"
+	"crypto/rand"
 	"errors"
 	"io"
 	"log/slog"
 	"os"
 	"reflect"
+	"syscall"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"golang.org/x/sys/unix"
 
 	"github.com/jellevandenhooff/gosim"
 )
@@ -556,6 +559,10 @@ func TestDiskStatFile(t *testing.T) {
 	if fi.Name() != "foo" {
 		t.Error("should be foo, not ", fi.Name())
 	}
+	expectedSize := int64(len("hello"))
+	if gotSize := fi.Size(); gotSize != expectedSize {
+		t.Errorf("bad size: got %d, expected %d", gotSize, expectedSize)
+	}
 }
 
 func TestDiskStatFd(t *testing.T) {
@@ -892,6 +899,193 @@ func TestDiskReadDir(t *testing.T) {
 			IsDir: false,
 		},
 	})
+}
+
+func TestMmapBasic(t *testing.T) {
+	setupRealDisk(t)
+
+	f, err := os.OpenFile("hello", os.O_CREATE|os.O_RDWR, 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := f.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
+
+	if _, err := f.WriteAt([]byte("hello"), 0); err != nil {
+		t.Error(err)
+	}
+
+	data, err := unix.Mmap(int(f.Fd()), 0, 4096, syscall.PROT_READ, syscall.MAP_SHARED)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := unix.Munmap(data); err != nil {
+			t.Error(err)
+		}
+	}()
+
+	if got := string(data[0:5]); got != "hello" {
+		t.Errorf("expected hello, got %q", got)
+	}
+
+	if _, err := f.WriteAt([]byte("goodbye"), 0); err != nil {
+		t.Error(err)
+	}
+
+	if got := string(data[0:7]); got != "goodbye" {
+		t.Errorf("expected goodbye, got %q", got)
+	}
+
+	if err := f.Truncate(2048); err != nil {
+		t.Error(err)
+	}
+	n, err := f.WriteAt([]byte("straddle"), 2048-3)
+	if n != 8 || err != nil {
+		t.Errorf("tried to write, got %d %v", n, err)
+	}
+	if got := string(data[2048-3 : 2048-3+8]); got != "straddle" {
+		t.Errorf("expected straddle, got %q", got)
+	}
+
+	if err := f.Truncate(1024); err != nil {
+		t.Error(err)
+	}
+
+	if got := string(data[2048-3 : 2048-3+8]); got != "\x00\x00\x00\x00\x00\x00\x00\x00" {
+		t.Errorf("expected zeroes, got %q", got)
+	}
+}
+
+type mmapTester struct {
+	file     *os.File
+	expected []byte
+	mmaps    map[string][]byte
+}
+
+func (f *mmapTester) truncate(t *testing.T, n int) {
+	t.Logf("truncating %d", n)
+
+	if err := f.file.Truncate(int64(n)); err != nil {
+		t.Fatal(n)
+	}
+	if n > len(f.expected) {
+		f.expected = append(f.expected, make([]byte, n-len(f.expected))...)
+	}
+	if n < len(f.expected) {
+		f.expected = f.expected[:n]
+	}
+}
+
+func (f *mmapTester) readAt(t *testing.T, pos, n int) {
+	t.Logf("reading %d %d", pos, n)
+
+	expected := make([]byte, n)
+	if pos <= len(f.expected) {
+		copy(expected, f.expected[pos:])
+	}
+
+	for name, mmap := range f.mmaps {
+		t.Logf("checking mmap %s", name)
+
+		if pos >= len(mmap) {
+			t.Logf("out of range, skipping")
+			continue
+		}
+
+		got := mmap[pos:min(pos+n, len(mmap))]
+		if !bytes.Equal(expected[:len(got)], got) {
+			t.Errorf("expected %v, got %v", expected, got)
+		}
+	}
+}
+
+func (f *mmapTester) writeAt(t *testing.T, pos, n int) {
+	t.Logf("writing %d %d", pos, n)
+
+	b := make([]byte, n)
+	rand.Read(b)
+
+	m, err := f.file.WriteAt(b, int64(pos))
+	if err != nil || m != n {
+		t.Errorf("expected ok write, got %d %v", m, err)
+	}
+
+	if pos+n > len(f.expected) {
+		// append zeroes
+		f.expected = append(f.expected, make([]byte, pos+n-len(f.expected))...)
+	}
+	copy(f.expected[pos:], b)
+}
+
+func (f *mmapTester) mmap(t *testing.T, name string, n int) {
+	mmap, err := unix.Mmap(int(f.file.Fd()), 0, n, syscall.PROT_READ, syscall.MAP_SHARED)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.mmaps[name] = mmap
+}
+
+func (f *mmapTester) munmap(t *testing.T, name string) {
+	if err := unix.Munmap(f.mmaps[name]); err != nil {
+		t.Fatal(err)
+	}
+	delete(f.mmaps, name)
+}
+
+func TestMmapComplex(t *testing.T) {
+	setupRealDisk(t)
+
+	f, err := os.OpenFile("hello", os.O_CREATE|os.O_RDWR, 0o644)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer f.Close()
+
+	mt := &mmapTester{
+		file:     f,
+		expected: []byte{},
+		mmaps:    make(map[string][]byte),
+	}
+
+	mt.readAt(t, 0, 10)
+	mt.writeAt(t, 0, 10)
+	mt.readAt(t, 0, 10)
+
+	mt.mmap(t, "big", 4096)
+	mt.mmap(t, "small", 1024)
+
+	mt.readAt(t, 0, 10)
+	mt.readAt(t, 0, 4096)
+
+	mt.writeAt(t, 0, 1024)
+	mt.readAt(t, 0, 1024)
+
+	mt.munmap(t, "small")
+	mt.mmap(t, "small", 1024)
+
+	mt.writeAt(t, 0, 4096)
+	mt.readAt(t, 0, 4096)
+
+	mt.writeAt(t, 1024-20, 40)
+	mt.readAt(t, 1024-128, 128)
+
+	mt.writeAt(t, 4096-128, 256)
+	mt.readAt(t, 4096-128, 256)
+
+	mt.truncate(t, 4000)
+	mt.readAt(t, 0, 4096)
+
+	mt.truncate(t, 4096)
+	mt.readAt(t, 4000, 96)
+	mt.writeAt(t, 4000, 96)
+
+	mt.writeAt(t, 4000, 200)
+	mt.readAt(t, 4000, 200)
 }
 
 // open dir

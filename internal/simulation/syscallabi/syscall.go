@@ -37,12 +37,12 @@ func GetGoroutineLocalSyscall() *Syscall {
 type Syscall struct {
 	OS OS
 
-	Trap                         uintptr
-	Int0, Int1, Int2, Int3, Int4 uintptr
-	Ptr0, Ptr1, Ptr2, Ptr3, Ptr4 any
-	R0, R1                       uintptr
-	RPtr0                        any
-	Errno                        uintptr
+	Trap                               uintptr
+	Int0, Int1, Int2, Int3, Int4, Int5 uintptr
+	Ptr0, Ptr1, Ptr2, Ptr3, Ptr4       any
+	R0, R1                             uintptr
+	RPtr0                              any
+	Errno                              uintptr
 
 	Sema uint32
 }

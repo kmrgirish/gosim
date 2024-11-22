@@ -35,6 +35,8 @@ type linuxOSIface interface {
 	SysClose(fd int) (err error)
 	SysConnect(s int, addr unsafe.Pointer, addrlen Socklen) (err error)
 	SysFcntl(fd int, cmd int, arg int) (val int, err error)
+	SysFdatasync(fd int) (err error)
+	SysFlock(fd int, how int) (err error)
 	SysFstat(fd int, stat syscallabi.ValueView[Stat_t]) (err error)
 	SysFstatat(dirfd int, path string, stat syscallabi.ValueView[Stat_t], flags int) (err error)
 	SysFsync(fd int) (err error)
@@ -46,6 +48,9 @@ type linuxOSIface interface {
 	SysGetsockname(fd int, rsa syscallabi.ValueView[RawSockaddrAny], addrlen syscallabi.ValueView[Socklen]) (err error)
 	SysGetsockopt(s int, level int, name int, val unsafe.Pointer, vallen syscallabi.ValueView[Socklen]) (err error)
 	SysListen(s int, n int) (err error)
+	SysMadvise(b syscallabi.SliceView[byte], advice int) (err error)
+	SysMmap(addr uintptr, length uintptr, prot int, flags int, fd int, offset int64) (xaddr uintptr, err error)
+	SysMunmap(addr uintptr, length uintptr) (err error)
 	SysOpenat(dirfd int, path string, flags int, mode uint32) (fd int, err error)
 	SysPread64(fd int, p syscallabi.SliceView[byte], offset int64) (n int, err error)
 	SysPwrite64(fd int, p syscallabi.SliceView[byte], offset int64) (n int, err error)
@@ -133,6 +138,21 @@ func (os *LinuxOS) HandleSyscall(syscall *syscallabi.Syscall) {
 		arg := int(syscall.Int2)
 		val, err := os.SysFcntl(fd, cmd, arg)
 		syscall.R0 = uintptr(val)
+		syscall.Errno = syscallabi.ErrErrno(err)
+		syscall.Complete()
+	case unix.SYS_FDATASYNC:
+		// called by (for find references):
+		_ = SyscallSysFdatasync
+		fd := int(syscall.Int0)
+		err := os.SysFdatasync(fd)
+		syscall.Errno = syscallabi.ErrErrno(err)
+		syscall.Complete()
+	case unix.SYS_FLOCK:
+		// called by (for find references):
+		_ = SyscallSysFlock
+		fd := int(syscall.Int0)
+		how := int(syscall.Int1)
+		err := os.SysFlock(fd, how)
 		syscall.Errno = syscallabi.ErrErrno(err)
 		syscall.Complete()
 	case unix.SYS_FSTAT:
@@ -227,6 +247,35 @@ func (os *LinuxOS) HandleSyscall(syscall *syscallabi.Syscall) {
 		s := int(syscall.Int0)
 		n := int(syscall.Int1)
 		err := os.SysListen(s, n)
+		syscall.Errno = syscallabi.ErrErrno(err)
+		syscall.Complete()
+	case unix.SYS_MADVISE:
+		// called by (for find references):
+		_ = SyscallSysMadvise
+		b := syscallabi.NewSliceView(syscall.Ptr0.(*byte), syscall.Int0)
+		advice := int(syscall.Int1)
+		err := os.SysMadvise(b, advice)
+		syscall.Errno = syscallabi.ErrErrno(err)
+		syscall.Complete()
+	case unix.SYS_MMAP:
+		// called by (for find references):
+		_ = SyscallSysMmap
+		addr := uintptr(syscall.Int0)
+		length := uintptr(syscall.Int1)
+		prot := int(syscall.Int2)
+		flags := int(syscall.Int3)
+		fd := int(syscall.Int4)
+		offset := int64(syscall.Int5)
+		xaddr, err := os.SysMmap(addr, length, prot, flags, fd, offset)
+		syscall.R0 = uintptr(xaddr)
+		syscall.Errno = syscallabi.ErrErrno(err)
+		syscall.Complete()
+	case unix.SYS_MUNMAP:
+		// called by (for find references):
+		_ = SyscallSysMunmap
+		addr := uintptr(syscall.Int0)
+		length := uintptr(syscall.Int1)
+		err := os.SysMunmap(addr, length)
 		syscall.Errno = syscallabi.ErrErrno(err)
 		syscall.Complete()
 	case unix.SYS_OPENAT:
@@ -441,6 +490,33 @@ func SyscallSysFcntl(fd int, cmd int, arg int) (val int, err error) {
 }
 
 //go:norace
+func SyscallSysFdatasync(fd int) (err error) {
+	// invokes (for go to definition):
+	_ = (*LinuxOS).SysFdatasync
+	syscall := syscallabi.GetGoroutineLocalSyscall()
+	syscall.OS = linuxOS
+	syscall.Trap = unix.SYS_FDATASYNC
+	syscall.Int0 = uintptr(fd)
+	linuxOS.dispatchSyscall(syscall)
+	err = syscallabi.ErrnoErr(syscall.Errno)
+	return
+}
+
+//go:norace
+func SyscallSysFlock(fd int, how int) (err error) {
+	// invokes (for go to definition):
+	_ = (*LinuxOS).SysFlock
+	syscall := syscallabi.GetGoroutineLocalSyscall()
+	syscall.OS = linuxOS
+	syscall.Trap = unix.SYS_FLOCK
+	syscall.Int0 = uintptr(fd)
+	syscall.Int1 = uintptr(how)
+	linuxOS.dispatchSyscall(syscall)
+	err = syscallabi.ErrnoErr(syscall.Errno)
+	return
+}
+
+//go:norace
 func SyscallSysFstat(fd int, stat *Stat_t) (err error) {
 	// invokes (for go to definition):
 	_ = (*LinuxOS).SysFstat
@@ -606,6 +682,54 @@ func SyscallSysListen(s int, n int) (err error) {
 	syscall.Trap = unix.SYS_LISTEN
 	syscall.Int0 = uintptr(s)
 	syscall.Int1 = uintptr(n)
+	linuxOS.dispatchSyscall(syscall)
+	err = syscallabi.ErrnoErr(syscall.Errno)
+	return
+}
+
+//go:norace
+func SyscallSysMadvise(b []byte, advice int) (err error) {
+	// invokes (for go to definition):
+	_ = (*LinuxOS).SysMadvise
+	syscall := syscallabi.GetGoroutineLocalSyscall()
+	syscall.OS = linuxOS
+	syscall.Trap = unix.SYS_MADVISE
+	syscall.Ptr0, syscall.Int0 = unsafe.SliceData(b), uintptr(len(b))
+	syscall.Int1 = uintptr(advice)
+	linuxOS.dispatchSyscall(syscall)
+	err = syscallabi.ErrnoErr(syscall.Errno)
+	syscall.Ptr0 = nil
+	return
+}
+
+//go:norace
+func SyscallSysMmap(addr uintptr, length uintptr, prot int, flags int, fd int, offset int64) (xaddr uintptr, err error) {
+	// invokes (for go to definition):
+	_ = (*LinuxOS).SysMmap
+	syscall := syscallabi.GetGoroutineLocalSyscall()
+	syscall.OS = linuxOS
+	syscall.Trap = unix.SYS_MMAP
+	syscall.Int0 = uintptr(addr)
+	syscall.Int1 = uintptr(length)
+	syscall.Int2 = uintptr(prot)
+	syscall.Int3 = uintptr(flags)
+	syscall.Int4 = uintptr(fd)
+	syscall.Int5 = uintptr(offset)
+	linuxOS.dispatchSyscall(syscall)
+	xaddr = uintptr(syscall.R0)
+	err = syscallabi.ErrnoErr(syscall.Errno)
+	return
+}
+
+//go:norace
+func SyscallSysMunmap(addr uintptr, length uintptr) (err error) {
+	// invokes (for go to definition):
+	_ = (*LinuxOS).SysMunmap
+	syscall := syscallabi.GetGoroutineLocalSyscall()
+	syscall.OS = linuxOS
+	syscall.Trap = unix.SYS_MUNMAP
+	syscall.Int0 = uintptr(addr)
+	syscall.Int1 = uintptr(length)
 	linuxOS.dispatchSyscall(syscall)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	return
@@ -789,6 +913,10 @@ func IsHandledSyscall(trap uintptr) bool {
 		return true
 	case unix.SYS_FCNTL:
 		return true
+	case unix.SYS_FDATASYNC:
+		return true
+	case unix.SYS_FLOCK:
+		return true
 	case unix.SYS_FSTAT:
 		return true
 	case unix.SYS_FSTATAT:
@@ -810,6 +938,12 @@ func IsHandledSyscall(trap uintptr) bool {
 	case unix.SYS_GETSOCKOPT:
 		return true
 	case unix.SYS_LISTEN:
+		return true
+	case unix.SYS_MADVISE:
+		return true
+	case unix.SYS_MMAP:
+		return true
+	case unix.SYS_MUNMAP:
 		return true
 	case unix.SYS_OPENAT:
 		return true

@@ -28,6 +28,14 @@ func GolangOrgXSysUnix_connect(s int, addr unsafe.Pointer, addrlen simulation.So
 	return simulation.SyscallSysConnect(s, addr, addrlen)
 }
 
+func GolangOrgXSysUnix_Fdatasync(fd int) (err error) {
+	return simulation.SyscallSysFdatasync(fd)
+}
+
+func GolangOrgXSysUnix_Flock(fd int, how int) (err error) {
+	return simulation.SyscallSysFlock(fd, how)
+}
+
 func GolangOrgXSysUnix_Fstat(fd int, stat *simulation.Stat_t) (err error) {
 	return simulation.SyscallSysFstat(fd, stat)
 }
@@ -70,6 +78,18 @@ func GolangOrgXSysUnix_getsockopt(s int, level int, name int, val unsafe.Pointer
 
 func GolangOrgXSysUnix_Listen(s int, n int) (err error) {
 	return simulation.SyscallSysListen(s, n)
+}
+
+func GolangOrgXSysUnix_Madvise(b []byte, advice int) (err error) {
+	return simulation.SyscallSysMadvise(b, advice)
+}
+
+func GolangOrgXSysUnix_mmap(addr uintptr, length uintptr, prot int, flags int, fd int, offset int64) (xaddr uintptr, err error) {
+	return simulation.SyscallSysMmap(addr, length, prot, flags, fd, offset)
+}
+
+func GolangOrgXSysUnix_munmap(addr uintptr, length uintptr) (err error) {
+	return simulation.SyscallSysMunmap(addr, length)
 }
 
 func GolangOrgXSysUnix_openat(dirfd int, path string, flags int, mode uint32) (fd int, err error) {

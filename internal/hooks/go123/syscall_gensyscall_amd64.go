@@ -32,6 +32,14 @@ func Syscall_fcntl(fd int, cmd int, arg int) (val int, err error) {
 	return simulation.SyscallSysFcntl(fd, cmd, arg)
 }
 
+func Syscall_Fdatasync(fd int) (err error) {
+	return simulation.SyscallSysFdatasync(fd)
+}
+
+func Syscall_Flock(fd int, how int) (err error) {
+	return simulation.SyscallSysFlock(fd, how)
+}
+
 func Syscall_Fstat(fd int, stat *simulation.Stat_t) (err error) {
 	return simulation.SyscallSysFstat(fd, stat)
 }
@@ -70,6 +78,18 @@ func Syscall_getsockopt(s int, level int, name int, val unsafe.Pointer, vallen *
 
 func Syscall_Listen(s int, n int) (err error) {
 	return simulation.SyscallSysListen(s, n)
+}
+
+func Syscall_Madvise(b []byte, advice int) (err error) {
+	return simulation.SyscallSysMadvise(b, advice)
+}
+
+func Syscall_mmap(addr uintptr, length uintptr, prot int, flags int, fd int, offset int64) (xaddr uintptr, err error) {
+	return simulation.SyscallSysMmap(addr, length, prot, flags, fd, offset)
+}
+
+func Syscall_munmap(addr uintptr, length uintptr) (err error) {
+	return simulation.SyscallSysMunmap(addr, length)
 }
 
 func Syscall_openat(dirfd int, path string, flags int, mode uint32) (fd int, err error) {

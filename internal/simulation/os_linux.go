@@ -33,6 +33,8 @@ type LinuxOS struct {
 
 	files  map[int]interface{}
 	nextFd int
+
+	mmaps map[uintptr]*fs.Mmap
 }
 
 func NewLinuxOS(simulation *Simulation, machine *Machine, dispatcher syscallabi.Dispatcher) *LinuxOS {
@@ -45,6 +47,8 @@ func NewLinuxOS(simulation *Simulation, machine *Machine, dispatcher syscallabi.
 
 		files:  make(map[int]interface{}),
 		nextFd: 5,
+
+		mmaps: make(map[uintptr]*fs.Mmap),
 	}
 }
 
@@ -63,7 +67,7 @@ func (l *LinuxOS) doShutdown() {
 const logEnabled = false
 
 func logf(fmt string, args ...any) {
-	if logEnabled {
+	if logEnabled && logInitialized {
 		log.Printf(fmt, args...)
 	}
 }
@@ -570,6 +574,11 @@ func (l *LinuxOS) SysFsync(fd int) error {
 	return nil
 }
 
+func (l *LinuxOS) SysFdatasync(fd int) error {
+	// TODO: sync only some subset instead?
+	return l.SysFsync(fd)
+}
+
 func fillStat(view syscallabi.ValueView[syscall.Stat_t], in fs.StatResp) {
 	var out syscall.Stat_t
 	out.Ino = uint64(in.Inode)
@@ -578,6 +587,7 @@ func fillStat(view syscallabi.ValueView[syscall.Stat_t], in fs.StatResp) {
 	} else {
 		out.Mode = syscall.S_IFREG
 	}
+	out.Size = in.Size
 	view.Set(out)
 }
 
@@ -1093,6 +1103,14 @@ func (l *LinuxOS) SysFcntl(fd int, cmd int, arg int) (val int, err error) {
 	return 0, syscall.ENOSYS
 }
 
+func (l *LinuxOS) SysFlock(fd int, how int) (err error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	// TODO: reconsider
+	return nil
+}
+
 func (l *LinuxOS) SysConnect(fd int, addrPtr unsafe.Pointer, addrLen Socklen) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -1176,5 +1194,68 @@ func (l *LinuxOS) SysUname(buf syscallabi.ValueView[Utsname]) (err error) {
 	}
 	nameArray[n] = 0
 	name.Write(nameArray[:n+1])
+	return nil
+}
+
+func (l *LinuxOS) SysMadvise(b syscallabi.SliceView[byte], advice int) (err error) {
+	logf("madvise %d %d %d", uintptr(unsafe.Pointer(unsafe.SliceData(b.Ptr))), b.Len(), advice)
+	// ignore? check args for some sanity?
+	return nil
+}
+
+func (l *LinuxOS) SysMmap(addr uintptr, length uintptr, prot int, flags int, fd int, offset int64) (xaddr uintptr, err error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.shutdown {
+		return 0, syscall.EINVAL
+	}
+
+	logf("mmap %d %d %d %d %d %d", addr, length, prot, flags, fd, offset)
+
+	if addr != 0 {
+		return 0, syscall.EINVAL
+	}
+	if prot != syscall.PROT_READ {
+		return 0, syscall.EINVAL
+	}
+	if flags != syscall.MAP_SHARED {
+		return 0, syscall.EINVAL
+	}
+	if offset != 0 {
+		return 0, syscall.EINVAL
+	}
+
+	fdInternal, ok := l.files[fd]
+	if !ok {
+		return 0, syscall.EBADFD
+	}
+
+	file, ok := fdInternal.(*OsFile)
+	if !ok {
+		return 0, syscall.EBADFD
+	}
+
+	mmap := l.machine.filesystem.Mmap(file.inode, int(length))
+	xaddr = uintptr(unsafe.Pointer(unsafe.SliceData(mmap.Data.Ptr)))
+	l.mmaps[xaddr] = mmap
+	return xaddr, nil
+}
+
+func (l *LinuxOS) SysMunmap(addr uintptr, length uintptr) (err error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.shutdown {
+		return syscall.EINVAL
+	}
+
+	logf("munmap %d %d", addr, length)
+
+	mmap, ok := l.mmaps[addr]
+	if !ok {
+		return syscall.EINVAL
+	}
+	l.machine.filesystem.Munmap(mmap)
+	delete(l.mmaps, addr)
+
 	return nil
 }

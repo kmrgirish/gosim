@@ -219,6 +219,16 @@ func (t *packageTranslator) rewriteStdlibEmptyAndLinkname(c *dstutil.Cursor) {
 			os.Exit(1)
 		}
 	}
+
+	// HACK: insert //go:nocheckptr for Mmap calls in the syscall packages.  The
+	// simulation package implements Mmap with a backing slice allocated on the
+	// heap, and checkptr is not happy with the unsafe conversion from uintptr
+	// to unsafe.Pointer.
+	// I believe checkptr can be safely overriden because the simulation keeps
+	// the backing slice alive until Munmap is called.
+	if decl.Name.Name == "Mmap" && (t.pkgPath == "syscall" || t.pkgPath == "golang.org/x/sys/unix") {
+		decl.Decs.Start = append(decl.Decs.Start, "//go:nocheckptr")
+	}
 }
 
 func removeLinknames(commentLines []string) {

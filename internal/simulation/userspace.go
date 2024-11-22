@@ -55,6 +55,8 @@ func (w gosimLogWriter) Write(b []byte) (n int, err error) {
 	return len(b), nil
 }
 
+var logInitialized = false
+
 func setupSlog(machineLabel string) {
 	// We play a funny game with the logger. There exists a default slog.Logger in
 	// every machine, since they all have their own set of globals. All loggers
@@ -84,6 +86,8 @@ func setupSlog(machineLabel string) {
 	// XXX: test this?
 	log.SetFlags(log.Lshortfile)
 	slog.SetDefault(slog.New(gosimSlogHandler{inner: handler}).With("machine", machineLabel))
+
+	logInitialized = true
 }
 
 func setupUserspace(gosimOS_ *GosimOS, linuxOS_ *LinuxOS, machineID int, label string) {
