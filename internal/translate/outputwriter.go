@@ -15,7 +15,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strings"
 	"sync"
 
 	"github.com/dave/dst"
@@ -196,17 +195,6 @@ func (w *outputWriter) maybeDeleteGeneratedFiles(rootOutputDir string) error {
 		}
 
 		if _, ok := desiredFinal[path]; !ok {
-			// XXX: what about .s files? why these special cases?
-			if !strings.HasSuffix(path, "_gosim.go") &&
-				!strings.HasSuffix(path, "_gosim_test.go") &&
-				filepath.Base(path) != "globals.go" &&
-				filepath.Base(path) != "globals_for_test.go" &&
-				filepath.Base(path) != "globals_test.go" &&
-				filepath.Base(path) != "gosim_meta_test.go" &&
-				filepath.Base(path) != "gosimaliashack.go" {
-				return nil
-			}
-
 			if _, ok := touchedDirs[filepath.Dir(path)]; !ok {
 				// skip directories that we are not writing to
 				return nil

@@ -80,14 +80,39 @@ func filterTestFiles(files []*ast.File, fset *token.FileSet) []*ast.File {
 	return filtered
 }
 
-func renameFile(filePath string) string {
-	if strings.HasSuffix(filePath, "_test.go") {
-		return strings.TrimSuffix(filePath, "_test.go") + "_gosim_test.go"
+// renameFile removes any implied build constraints from filenames that might
+// not be satisfied.
+//
+// Translate always translates with GOOS set to linux, while the translated code
+// might run on GOOS set to another OS like darwin. The filename can imply a GOOS
+// constraint (see https://pkg.go.dev/cmd/go#hdr-Build_constraints). If that is
+// the case, neuter the constraint by adding a "_" to the name. We no longer
+// need the constraint because all translated code is compiled together.
+func renameFile(cfg gosimtool.BuildConfig, filePath string) string {
+	dotIdx := strings.LastIndex(filePath, ".")
+	withoutDot := filePath[:dotIdx]
+	ext := filePath[dotIdx:]
+
+	parts := strings.Split(withoutDot, "_")
+	if len(parts) >= 2 && parts[len(parts)-1] == "test" {
+		parts = parts[:len(parts)-1]
 	}
-	if strings.HasSuffix(filePath, ".go") {
-		return strings.TrimSuffix(filePath, ".go") + "_gosim.go"
+
+	matched := false
+	if len(parts) >= 2 && parts[len(parts)-2] == cfg.GOOS && parts[len(parts)-1] == cfg.GOARCH {
+		matched = true
 	}
-	panic(filePath)
+	if len(parts) >= 1 && parts[len(parts)-1] == cfg.GOOS {
+		matched = true
+	}
+
+	if !matched {
+		return filePath
+	}
+
+	// for now, after translate all files should be included in the build
+	// modify the filename minimally to neuter any excluded files
+	return withoutDot + "_" + ext
 }
 
 func pathForFile(pkg, file string) string {
@@ -301,15 +326,15 @@ func translatePackage(args *translatePackageArgs) *TranslatePackageResult {
 		if err != nil {
 			log.Fatal(err)
 		}
-		if err := writer.stage(pathForFile(outputPackage, renameFile(filepath.Base(filePath))), bytes); err != nil {
+		if err := writer.stage(pathForFile(outputPackage, renameFile(args.cfg, filepath.Base(filePath))), bytes); err != nil {
 			log.Fatal(err)
 		}
 	}
 
 	if globalsName, ok := map[packageKind]string{
-		PackageKindBase:    "globals.go",
-		PackageKindForTest: "globals_for_test.go",
-		PackageKindTests:   "globals_test.go",
+		PackageKindBase:    "gosim_globals.go",
+		PackageKindForTest: "gosim_globals_for_test.go",
+		PackageKindTests:   "gosim_globals_test.go",
 	}[kind]; ok {
 		// write a globals.go, if applicable
 		if len(translator.collect.globalFields) > 0 || len(translator.collect.inits) > 0 || len(translator.collect.bindspecs) > 0 || len(translator.collect.sharedGlobalFields) > 0 || len(translator.collect.maps) > 0 {
@@ -329,16 +354,17 @@ func translatePackage(args *translatePackageArgs) *TranslatePackageResult {
 
 	if kind == PackageKindBase && translator.keepAsmPkgs[args.pkg.PkgPath] {
 		// copy over assembly implementations for specific packages
-		if translator.keepAsmPkgs[args.pkg.PkgPath] {
-			for _, filePath := range args.pkg.OtherFiles {
-				slog.Debug("copying other file", "pkg", args.pkg.PkgPath, "file", filePath)
-				bytes, err := os.ReadFile(filePath)
-				if err != nil {
-					log.Fatal(err)
-				}
-				if err := writer.stage(pathForFile(outputPackage, filepath.Base(filePath)), bytes); err != nil {
-					log.Fatal(err)
-				}
+		for _, filePath := range args.pkg.OtherFiles {
+			slog.Debug("copying other file", "pkg", args.pkg.PkgPath, "file", filePath)
+			bytes, err := os.ReadFile(filePath)
+			if err != nil {
+				log.Fatal(err)
+			}
+			// prepend our header so cleanup will delete it,
+			// even though we do not modify the file
+			prefixed := append([]byte(header), bytes...)
+			if err := writer.stage(pathForFile(outputPackage, filepath.Base(filePath)), prefixed); err != nil {
+				log.Fatal(err)
 			}
 		}
 	}

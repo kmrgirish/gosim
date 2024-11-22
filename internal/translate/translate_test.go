@@ -219,3 +219,63 @@ func TestTranslate(t *testing.T) {
 		}
 	}
 }
+
+func TestRenameFile(t *testing.T) {
+	cfg := gosimtool.BuildConfig{
+		GOOS:   "linux",
+		GOARCH: "amd64",
+	}
+
+	testcases := []struct {
+		in, out string
+	}{
+		{
+			in:  "foo/bar.go",
+			out: "foo/bar.go",
+		},
+		{
+			in:  "foo/bar_test.go",
+			out: "foo/bar_test.go",
+		},
+		{
+			in:  "foo/bar_linux.go",
+			out: "foo/bar_linux_.go",
+		},
+		{
+			in:  "foo/bar_linux_test.go",
+			out: "foo/bar_linux_test_.go",
+		},
+		{
+			in:  "foo/bar_linux_amd64.go",
+			out: "foo/bar_linux_amd64_.go",
+		},
+		{
+			in:  "foo/bar_linux_amd64_test.go",
+			out: "foo/bar_linux_amd64_test_.go",
+		},
+		{
+			in:  "foo/bar_amd64.go",
+			out: "foo/bar_amd64.go",
+		},
+		{
+			in:  "foo/bar_amd64_test.go",
+			out: "foo/bar_amd64_test.go",
+		},
+
+		{
+			in:  "foo/bar_darwin.go",
+			out: "foo/bar_darwin.go",
+		},
+		{
+			in:  "foo/bar_darwin_test.go",
+			out: "foo/bar_darwin_test.go",
+		},
+	}
+
+	for _, testcase := range testcases {
+		got := renameFile(cfg, testcase.in)
+		if got != testcase.out {
+			t.Errorf("rename %q: expected %q, got %q", testcase.in, testcase.out, got)
+		}
+	}
+}
