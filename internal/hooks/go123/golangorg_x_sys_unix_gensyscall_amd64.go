@@ -32,6 +32,10 @@ func GolangOrgXSysUnix_connect(s int, addr unsafe.Pointer, addrlen simulation.So
 	return simulation.SyscallSysConnect(s, addr, addrlen)
 }
 
+func GolangOrgXSysUnix_Fallocate(fd int, mode uint32, off int64, len int64) (err error) {
+	return simulation.SyscallSysFallocate(fd, mode, off, len)
+}
+
 func GolangOrgXSysUnix_Fdatasync(fd int) (err error) {
 	return simulation.SyscallSysFdatasync(fd)
 }
@@ -122,6 +126,10 @@ func GolangOrgXSysUnix_read(fd int, p []byte) (n int, err error) {
 
 func GolangOrgXSysUnix_Renameat(olddirfd int, oldpath string, newdirfd int, newpath string) (err error) {
 	return simulation.SyscallSysRenameat(olddirfd, oldpath, newdirfd, newpath)
+}
+
+func GolangOrgXSysUnix_Seek(fd int, offset int64, whence int) (off int64, err error) {
+	return simulation.SyscallSysLseek(fd, offset, whence)
 }
 
 func GolangOrgXSysUnix_setsockopt(s int, level int, name int, val unsafe.Pointer, vallen uintptr) (err error) {

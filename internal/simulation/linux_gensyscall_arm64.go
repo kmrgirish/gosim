@@ -35,6 +35,7 @@ type linuxOSIface interface {
 	SysChdir(path string) (err error)
 	SysClose(fd int) (err error)
 	SysConnect(s int, addr unsafe.Pointer, addrlen Socklen) (err error)
+	SysFallocate(fd int, mode uint32, off int64, len int64) (err error)
 	SysFcntl(fd int, cmd int, arg int) (val int, err error)
 	SysFdatasync(fd int) (err error)
 	SysFlock(fd int, how int) (err error)
@@ -50,6 +51,7 @@ type linuxOSIface interface {
 	SysGetsockname(fd int, rsa syscallabi.ValueView[RawSockaddrAny], addrlen syscallabi.ValueView[Socklen]) (err error)
 	SysGetsockopt(s int, level int, name int, val unsafe.Pointer, vallen syscallabi.ValueView[Socklen]) (err error)
 	SysListen(s int, n int) (err error)
+	SysLseek(fd int, offset int64, whence int) (off int64, err error)
 	SysMadvise(b syscallabi.SliceView[byte], advice int) (err error)
 	SysMkdirat(dirfd int, path string, mode uint32) (err error)
 	SysMmap(addr uintptr, length uintptr, prot int, flags int, fd int, offset int64) (xaddr uintptr, err error)
@@ -138,6 +140,16 @@ func (os *LinuxOS) HandleSyscall(syscall *syscallabi.Syscall) {
 		addr := syscall.Ptr1.(unsafe.Pointer)
 		addrlen := Socklen(syscall.Int2)
 		err := os.SysConnect(s, addr, addrlen)
+		syscall.Errno = syscallabi.ErrErrno(err)
+		syscall.Complete()
+	case unix.SYS_FALLOCATE:
+		// called by (for find references):
+		_ = SyscallSysFallocate
+		fd := int(syscall.Int0)
+		mode := uint32(syscall.Int1)
+		off := int64(syscall.Int2)
+		len := int64(syscall.Int3)
+		err := os.SysFallocate(fd, mode, off, len)
 		syscall.Errno = syscallabi.ErrErrno(err)
 		syscall.Complete()
 	case unix.SYS_FCNTL:
@@ -265,6 +277,16 @@ func (os *LinuxOS) HandleSyscall(syscall *syscallabi.Syscall) {
 		s := int(syscall.Int0)
 		n := int(syscall.Int1)
 		err := os.SysListen(s, n)
+		syscall.Errno = syscallabi.ErrErrno(err)
+		syscall.Complete()
+	case unix.SYS_LSEEK:
+		// called by (for find references):
+		_ = SyscallSysLseek
+		fd := int(syscall.Int0)
+		offset := int64(syscall.Int1)
+		whence := int(syscall.Int2)
+		off, err := os.SysLseek(fd, offset, whence)
+		syscall.R0 = uintptr(off)
 		syscall.Errno = syscallabi.ErrErrno(err)
 		syscall.Complete()
 	case unix.SYS_MADVISE:
@@ -515,6 +537,22 @@ func SyscallSysConnect(s int, addr unsafe.Pointer, addrlen Socklen) (err error) 
 }
 
 //go:norace
+func SyscallSysFallocate(fd int, mode uint32, off int64, len int64) (err error) {
+	// invokes (for go to definition):
+	_ = (*LinuxOS).SysFallocate
+	syscall := syscallabi.GetGoroutineLocalSyscall()
+	syscall.OS = linuxOS
+	syscall.Trap = unix.SYS_FALLOCATE
+	syscall.Int0 = uintptr(fd)
+	syscall.Int1 = uintptr(mode)
+	syscall.Int2 = uintptr(off)
+	syscall.Int3 = uintptr(len)
+	linuxOS.dispatchSyscall(syscall)
+	err = syscallabi.ErrnoErr(syscall.Errno)
+	return
+}
+
+//go:norace
 func SyscallSysFcntl(fd int, cmd int, arg int) (val int, err error) {
 	// invokes (for go to definition):
 	_ = (*LinuxOS).SysFcntl
@@ -739,6 +777,22 @@ func SyscallSysListen(s int, n int) (err error) {
 	syscall.Int0 = uintptr(s)
 	syscall.Int1 = uintptr(n)
 	linuxOS.dispatchSyscall(syscall)
+	err = syscallabi.ErrnoErr(syscall.Errno)
+	return
+}
+
+//go:norace
+func SyscallSysLseek(fd int, offset int64, whence int) (off int64, err error) {
+	// invokes (for go to definition):
+	_ = (*LinuxOS).SysLseek
+	syscall := syscallabi.GetGoroutineLocalSyscall()
+	syscall.OS = linuxOS
+	syscall.Trap = unix.SYS_LSEEK
+	syscall.Int0 = uintptr(fd)
+	syscall.Int1 = uintptr(offset)
+	syscall.Int2 = uintptr(whence)
+	linuxOS.dispatchSyscall(syscall)
+	off = int64(syscall.R0)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	return
 }
@@ -985,6 +1039,8 @@ func IsHandledSyscall(trap uintptr) bool {
 		return true
 	case unix.SYS_CONNECT:
 		return true
+	case unix.SYS_FALLOCATE:
+		return true
 	case unix.SYS_FCNTL:
 		return true
 	case unix.SYS_FDATASYNC:
@@ -1014,6 +1070,8 @@ func IsHandledSyscall(trap uintptr) bool {
 	case unix.SYS_GETSOCKOPT:
 		return true
 	case unix.SYS_LISTEN:
+		return true
+	case unix.SYS_LSEEK:
 		return true
 	case unix.SYS_MADVISE:
 		return true

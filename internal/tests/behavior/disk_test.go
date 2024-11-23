@@ -501,6 +501,140 @@ func TestDiskReadAtAfterEndOfFile(t *testing.T) {
 	}
 }
 
+func TestDiskSeekBasic(t *testing.T) {
+	setupRealDisk(t)
+
+	f, err := os.OpenFile("hello", os.O_CREATE|os.O_RDWR, 0o644)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	ok := func(offset int64, whence int, expected int64) {
+		t.Helper()
+
+		got, err := f.Seek(offset, whence)
+		if err != nil {
+			t.Errorf("seek %d %d: %v", offset, whence, err)
+		}
+		if got != expected {
+			t.Errorf("seek %d %d: got %d, expected %d", offset, whence, got, expected)
+		}
+	}
+
+	bad := func(offset int64, whence int, expected error) {
+		t.Helper()
+
+		got, err := f.Seek(offset, whence)
+		if err == nil || !errors.Is(err, expected) {
+			t.Errorf("seek %d %d: got err %v, expected %v", offset, whence, err, expected)
+		}
+		if got != 0 {
+			t.Errorf("seek %d %d: expected 0 after failure, got %d", offset, whence, got)
+		}
+	}
+
+	// get current pos
+	pos, err := f.Seek(0, io.SeekCurrent)
+	if err != nil {
+		t.Error(err)
+	}
+	if pos != 0 {
+		t.Error(pos)
+	}
+
+	if _, err := f.Write([]byte("hello")); err != nil {
+		t.Error(err)
+		return
+	}
+
+	// get current pos
+	ok(0, io.SeekCurrent, 5)
+
+	// seek to start
+	ok(0, io.SeekStart, 0)
+	ok(0, io.SeekCurrent, 0)
+
+	// read from current pos
+	buf := make([]byte, 5)
+	if n, err := f.Read(buf); err != nil || n != 5 {
+		t.Error(n, err)
+	}
+	if string(buf) != "hello" {
+		t.Error(string(buf))
+	}
+	ok(0, io.SeekCurrent, 5)
+
+	// seek to start
+	ok(0, io.SeekStart, 0)
+	ok(0, io.SeekCurrent, 0)
+
+	// seek to end
+	ok(0, io.SeekEnd, 5)
+	ok(0, io.SeekCurrent, 5)
+
+	// seek after end
+	ok(5, io.SeekEnd, 10)
+	ok(0, io.SeekCurrent, 10)
+
+	// read in nowhere and stay
+	if n, err := f.Read(buf); err != io.EOF || n != 0 {
+		t.Error(n, err)
+	}
+	ok(0, io.SeekCurrent, 10)
+
+	// writeat over current and read
+	if n, err := f.WriteAt([]byte("world"), 8); err != nil || n != 5 {
+		t.Error(n, err)
+	}
+	if n, err := f.Read(buf); err != nil || n != 3 {
+		t.Error(n, err)
+	}
+	if string(buf[0:3]) != "rld" {
+		t.Error(buf[0:3])
+	}
+	ok(0, io.SeekCurrent, 13)
+
+	// seek from start and read
+	ok(8, io.SeekStart, 8)
+	if n, err := f.Read(buf); err != nil || n != 5 {
+		t.Error(n, err)
+	}
+	if string(buf) != "world" {
+		t.Error(buf)
+	}
+	ok(0, io.SeekCurrent, 13)
+
+	// seek after end and write
+	ok(2, io.SeekEnd, 15)
+	ok(0, io.SeekCurrent, 15)
+	if n, err := f.Write([]byte("goodbye")); err != nil || n != 7 {
+		t.Error(err)
+	}
+	ok(0, io.SeekCurrent, 22)
+
+	// invalid seek from start
+	bad(-2, io.SeekStart, syscall.EINVAL)
+	ok(0, io.SeekCurrent, 22)
+
+	// invalid seek from current
+	bad(-23, io.SeekCurrent, syscall.EINVAL)
+	ok(0, io.SeekCurrent, 22)
+
+	// invalid seek from end
+	pos, err = f.Seek(-23, io.SeekEnd)
+	bad(-23, io.SeekEnd, syscall.EINVAL)
+	ok(0, io.SeekCurrent, 22)
+
+	// ok negative seek
+	ok(-2, io.SeekCurrent, 20)
+	ok(0, io.SeekCurrent, 20)
+
+	// ok negative seek
+	ok(-5, io.SeekEnd, 17)
+	ok(0, io.SeekCurrent, 17)
+}
+
 func TestDiskOpenMissingFile(t *testing.T) {
 	setupRealDisk(t)
 

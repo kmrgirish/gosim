@@ -5,6 +5,7 @@ package simulation
 import (
 	"encoding/binary"
 	"errors"
+	"io"
 	"log"
 	"log/slog"
 	"math/rand"
@@ -477,6 +478,91 @@ func (l *LinuxOS) SysRead(fd int, data syscallabi.ByteSliceView) (int, error) {
 	default:
 		return 0, syscall.EBADFD
 	}
+}
+
+func (l *LinuxOS) SysFallocate(fd int, mode uint32, off int64, len int64) (err error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.shutdown {
+		return syscall.EINVAL
+	}
+
+	fdInternal, ok := l.files[fd]
+	if !ok {
+		return syscall.EBADFD
+	}
+
+	f, ok := fdInternal.(*OsFile)
+	if !ok {
+		return syscall.EBADFD
+	}
+
+	logf("fallocate %d %d %d %d", fd, mode, off, len)
+
+	if mode != 0 {
+		return syscall.EINVAL
+	}
+
+	if off != 0 {
+		return syscall.EINVAL
+	}
+
+	stat, err := l.simulation.main.filesystem.Statfd(f.inode)
+	if err != nil {
+		// huh
+		return err
+	}
+
+	if len > stat.Size {
+		l.machine.filesystem.Truncate(f.inode, int(len))
+	}
+
+	return nil
+}
+
+func (l *LinuxOS) SysLseek(fd int, offset int64, whence int) (off int64, err error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.shutdown {
+		return 0, syscall.EINVAL
+	}
+
+	fdInternal, ok := l.files[fd]
+	if !ok {
+		return 0, syscall.EBADFD
+	}
+
+	f, ok := fdInternal.(*OsFile)
+	if !ok {
+		return 0, syscall.EBADFD
+	}
+
+	logf("lseek %d %d %d", fd, offset, whence)
+	var newPos int64
+
+	switch whence {
+	case io.SeekCurrent:
+		newPos = f.pos + offset
+	case io.SeekEnd:
+		stat, err := l.simulation.main.filesystem.Statfd(f.inode)
+		if err != nil {
+			// huh
+			return 0, err
+		}
+		newPos = stat.Size + offset
+	case io.SeekStart:
+		newPos = offset
+	default:
+		return 0, syscall.EINVAL
+	}
+
+	if newPos < 0 {
+		return 0, syscall.EINVAL
+	}
+
+	f.pos = newPos
+
+	return f.pos, nil
 }
 
 func (l *LinuxOS) SysPwrite64(fd int, data syscallabi.ByteSliceView, offset int64) (int, error) {
