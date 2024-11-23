@@ -803,3 +803,42 @@ func TestMapLiteralRange(t *testing.T) {
 		t.Error("bad", seen, expected)
 	}
 }
+
+func TestMapAliasConversions(t *testing.T) {
+	type Alias map[int]int
+
+	x := []Alias{
+		map[int]int{1: 3},
+		map[int]int{2: 5},
+	}
+
+	y := [...]Alias{
+		map[int]int{3: 8},
+	}
+
+	var seen []pair
+	for _, m := range x {
+		for k, v := range m {
+			seen = append(seen, pair{key: k, value: v})
+		}
+	}
+	for _, m := range y {
+		for k, v := range m {
+			seen = append(seen, pair{key: k, value: v})
+		}
+	}
+
+	slices.SortFunc(seen, func(a pair, b pair) int {
+		return cmp.Compare(a.key, b.key)
+	})
+
+	expected := []pair{
+		{key: 1, value: 3},
+		{key: 2, value: 5},
+		{key: 3, value: 8},
+	}
+
+	if !reflect.DeepEqual(seen, expected) {
+		t.Error("bad", seen, expected)
+	}
+}

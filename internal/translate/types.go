@@ -318,28 +318,43 @@ func (b *implicitConversionsBuilder) before(c *astutil.Cursor) bool {
 		b.cursig = sig
 
 	case *ast.CompositeLit:
-		struc, ok := b.typesInfo.Types[node].Type.Underlying().(*types.Struct)
-		if !ok {
+		if struc, ok := b.typesInfo.Types[node].Type.Underlying().(*types.Struct); ok {
+			for idx, elt := range node.Elts {
+				if node, ok := elt.(*ast.KeyValueExpr); ok {
+					y := b.typesInfo.Types[node.Value]
+
+					name := node.Key.(*ast.Ident).Name
+
+					for i := 0; i < struc.NumFields(); i++ {
+						field := struc.Field(i)
+						if name == field.Name() {
+							x := field.Type()
+							if !types.Identical(y.Type, x) {
+								b.conversions[node.Value] = x
+							}
+						}
+					}
+				} else if idx < struc.NumFields() {
+					x := struc.Field(idx).Type()
+					y := b.typesInfo.Types[elt]
+					if !types.Identical(y.Type, x) {
+						b.conversions[elt] = x
+					}
+				}
+			}
 			break
 		}
 
-		for idx, elt := range node.Elts {
-			if node, ok := elt.(*ast.KeyValueExpr); ok {
-				y := b.typesInfo.Types[node.Value]
-
-				name := node.Key.(*ast.Ident).Name
-
-				for i := 0; i < struc.NumFields(); i++ {
-					field := struc.Field(i)
-					if name == field.Name() {
-						x := field.Type()
-						if !types.Identical(y.Type, x) {
-							b.conversions[node.Value] = x
-						}
-					}
-				}
-			} else if idx < struc.NumFields() {
-				x := struc.Field(idx).Type()
+		var elem types.Type
+		if arr, ok := b.typesInfo.Types[node].Type.Underlying().(*types.Array); ok {
+			elem = arr.Elem()
+		}
+		if slice, ok := b.typesInfo.Types[node].Type.Underlying().(*types.Slice); ok {
+			elem = slice.Elem()
+		}
+		if elem != nil {
+			for _, elt := range node.Elts {
+				x := elem
 				y := b.typesInfo.Types[elt]
 				if !types.Identical(y.Type, x) {
 					b.conversions[elt] = x
