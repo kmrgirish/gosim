@@ -20,6 +20,10 @@ func GolangOrgXSysUnix_bind(s int, addr unsafe.Pointer, addrlen simulation.Sockl
 	return simulation.SyscallSysBind(s, addr, addrlen)
 }
 
+func GolangOrgXSysUnix_Chdir(path string) (err error) {
+	return simulation.SyscallSysChdir(path)
+}
+
 func GolangOrgXSysUnix_Close(fd int) (err error) {
 	return simulation.SyscallSysClose(fd)
 }
@@ -52,6 +56,10 @@ func GolangOrgXSysUnix_Ftruncate(fd int, length int64) (err error) {
 	return simulation.SyscallSysFtruncate(fd, length)
 }
 
+func GolangOrgXSysUnix_Getcwd(buf []byte) (n int, err error) {
+	return simulation.SyscallSysGetcwd(buf)
+}
+
 func GolangOrgXSysUnix_Getdents(fd int, buf []byte) (n int, err error) {
 	return simulation.SyscallSysGetdents64(fd, buf)
 }
@@ -82,6 +90,10 @@ func GolangOrgXSysUnix_Listen(s int, n int) (err error) {
 
 func GolangOrgXSysUnix_Madvise(b []byte, advice int) (err error) {
 	return simulation.SyscallSysMadvise(b, advice)
+}
+
+func GolangOrgXSysUnix_Mkdirat(dirfd int, path string, mode uint32) (err error) {
+	return simulation.SyscallSysMkdirat(dirfd, path, mode)
 }
 
 func GolangOrgXSysUnix_mmap(addr uintptr, length uintptr, prot int, flags int, fd int, offset int64) (xaddr uintptr, err error) {

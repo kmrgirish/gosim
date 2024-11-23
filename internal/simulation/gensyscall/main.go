@@ -190,6 +190,7 @@ type syscallInfo struct {
 var filterCommon = []string{
 	"SYS_ACCEPT4",
 	"SYS_BIND",
+	"SYS_CHDIR",
 	"SYS_CLOSE",
 	"SYS_CONNECT",
 	"SYS_FCNTL",
@@ -198,6 +199,7 @@ var filterCommon = []string{
 	"SYS_FSTAT",
 	"SYS_FSYNC",
 	"SYS_FTRUNCATE",
+	"SYS_GETCWD",
 	"SYS_GETDENTS64",
 	"SYS_GETPEERNAME",
 	"SYS_GETPID",
@@ -206,6 +208,7 @@ var filterCommon = []string{
 	"SYS_GETSOCKOPT",
 	"SYS_LISTEN",
 	"SYS_MADVISE",
+	"SYS_MKDIRAT",
 	"SYS_MMAP",
 	"SYS_MUNMAP",
 	"SYS_OPENAT",

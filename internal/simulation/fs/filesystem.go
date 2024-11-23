@@ -7,6 +7,7 @@ import (
 	"maps"
 	"os"
 	"slices"
+	"strings"
 	"sync"
 	"syscall"
 	"unsafe"
@@ -99,10 +100,12 @@ func (f *backingFile) clone() *backingFile {
 
 type backingDir struct {
 	inode   int
+	parent  int
+	name    string // name in parent
 	entries map[string]int
 }
 
-const rootInode = 1
+const RootInode = 1
 
 type filesystemState struct {
 	objects map[int]any
@@ -118,6 +121,8 @@ func (fss *filesystemState) clone() *filesystemState {
 		case *backingDir:
 			objects[inode] = &backingDir{
 				inode:   obj.inode,
+				parent:  obj.parent,
+				name:    obj.name,
 				entries: maps.Clone(obj.entries),
 			}
 		}
@@ -128,6 +133,12 @@ func (fss *filesystemState) clone() *filesystemState {
 		next:    fss.next,
 	}
 }
+
+// TODOs for directories:
+// - handle ., .. consistently
+// - garbage collect directories
+// - prevent cycles
+// - add deps between renames/metadata ops to prevent cycles w/ crashes
 
 type Filesystem struct {
 	mu sync.Mutex
@@ -212,12 +223,13 @@ type fsOp interface {
 func inititalState() *filesystemState {
 	return &filesystemState{
 		objects: map[int]any{
-			rootInode: &backingDir{
-				inode:   rootInode,
+			RootInode: &backingDir{
+				inode:   RootInode,
+				parent:  RootInode,
 				entries: make(map[string]int),
 			},
 		},
-		next: rootInode + 1,
+		next: RootInode + 1,
 	}
 }
 
@@ -235,8 +247,14 @@ func (fs *filesystemState) getFile(idx int) *backingFile {
 	return fs.objects[idx].(*backingFile)
 }
 
-func (fs *filesystemState) getDir(idx int) *backingDir {
-	return fs.objects[idx].(*backingDir)
+func (fs *filesystemState) getFileOk(idx int) (*backingFile, bool) {
+	f, ok := fs.objects[idx].(*backingFile)
+	return f, ok
+}
+
+func (fs *filesystemState) getDir(idx int) (*backingDir, bool) {
+	dir, ok := fs.objects[idx].(*backingDir)
+	return dir, ok
 }
 
 type writeOp struct {
@@ -295,7 +313,7 @@ type dirOp struct {
 
 func (o *dirOp) apply(fs *filesystemState, gcer gcer) {
 	for _, p := range o.parts {
-		dir := fs.getDir(p.dir)
+		dir, _ := fs.getDir(p.dir)
 
 		old := dir.entries[p.name]
 		if file, ok := fs.objects[old].(*backingFile); ok {
@@ -305,6 +323,11 @@ func (o *dirOp) apply(fs *filesystemState, gcer gcer) {
 				gcer.maybeGC(old) // XXX: jank. think about locking/ordering/help
 			}
 		}
+		if file, ok := fs.objects[old].(*backingDir); ok {
+			file.parent = 0
+			file.name = ""
+			// GC? when?
+		}
 
 		if p.file == -1 {
 			delete(dir.entries, p.name)
@@ -313,6 +336,10 @@ func (o *dirOp) apply(fs *filesystemState, gcer gcer) {
 			if file, ok := fs.objects[p.file].(*backingFile); ok {
 				file.linkCount++
 				// slog.Info("fs link count", "inode", file.inode, "count", file.linkCount)
+			}
+			if file, ok := fs.objects[p.file].(*backingDir); ok {
+				file.parent = dir.inode
+				file.name = p.name
 			}
 		}
 	}
@@ -636,11 +663,39 @@ func (fs *Filesystem) Sync(inode int) {
 	fs.flushInode(inode)
 }
 
-func (fs *Filesystem) Mkdir(name string) error {
+func (fs *Filesystem) Getdirinode(dirInode int, path string) (int, error) {
+	// For chdir
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 
-	if _, ok := fs.mem.getDir(rootInode).entries[name]; ok {
+	dirInode, _, err := fs.walkpath(dirInode, path, false)
+	if err != nil {
+		return 0, err
+	}
+
+	_, ok := fs.mem.getDir(dirInode)
+	if !ok {
+		return 0, syscall.ENOTDIR
+	}
+
+	return dirInode, nil
+}
+
+func (fs *Filesystem) Mkdir(dirInode int, path string) error {
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+
+	dirInode, name, err := fs.walkpath(dirInode, path, true)
+	if err != nil {
+		return err
+	}
+
+	dir, ok := fs.mem.getDir(dirInode)
+	if !ok {
+		return syscall.ENOTDIR
+	}
+
+	if _, ok := dir.entries[name]; ok {
 		return errors.New("help already exists")
 	}
 
@@ -654,7 +709,7 @@ func (fs *Filesystem) Mkdir(name string) error {
 	dOp := &dirOp{
 		parts: []dirOpPart{
 			{
-				dir:  rootInode,
+				dir:  dirInode,
 				name: name,
 				file: inode,
 			},
@@ -670,8 +725,6 @@ type StatResp struct {
 	IsDir bool
 	Size  int64
 }
-
-// XXX: these two stats should share implementation
 
 func (fs *Filesystem) statLocked(inode int) (StatResp, error) {
 	obj := fs.mem.objects[inode]
@@ -694,14 +747,29 @@ func (fs *Filesystem) statLocked(inode int) (StatResp, error) {
 	}
 }
 
-func (fs *Filesystem) Stat(path string) (StatResp, error) {
+func (fs *Filesystem) Stat(dirInode int, path string) (StatResp, error) {
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 
-	dir := fs.mem.getDir(rootInode)
-	inode, ok := dir.entries[path]
+	dirInode, name, err := fs.walkpath(dirInode, path, true)
+	if err != nil {
+		return StatResp{}, err
+	}
+
+	dir, ok := fs.mem.getDir(dirInode)
 	if !ok {
-		return StatResp{}, syscall.ENOENT
+		return StatResp{}, syscall.ENOTDIR
+	}
+
+	var inode int
+	if name == "." {
+		// TODO: clean up...
+		inode = dirInode
+	} else {
+		inode, ok = dir.entries[name]
+		if !ok {
+			return StatResp{}, syscall.ENOENT
+		}
 	}
 	return fs.statLocked(inode)
 }
@@ -713,20 +781,73 @@ func (fs *Filesystem) Statfd(inode int) (StatResp, error) {
 	return fs.statLocked(inode)
 }
 
-func (fs *Filesystem) Remove(path string) error {
+// for getcwd
+func (fs *Filesystem) Getpath(dirInode int) (string, error) {
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 
-	dir := fs.mem.getDir(rootInode)
-	if _, ok := dir.entries[path]; !ok {
+	var stack_ [16]string
+	s := stack_[:0]
+	for dirInode != RootInode {
+		dir, ok := fs.mem.getDir(dirInode)
+		if !ok {
+			return "", syscall.ENOTDIR
+		}
+
+		s = append(s, dir.name)
+		dirInode = dir.parent
+	}
+
+	if len(s) == 0 {
+		return "/", nil
+	}
+
+	s = append(s, "")
+	slices.Reverse(s)
+	return strings.Join(s, "/"), nil
+}
+
+func (fs *Filesystem) Remove(dirInode int, path string, rmDir bool) error {
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+
+	dirInode, name, err := fs.walkpath(dirInode, path, true)
+	if err != nil {
+		return err
+	}
+
+	dir, ok := fs.mem.getDir(dirInode)
+	if !ok {
+		return syscall.ENOTDIR
+	}
+
+	entry, ok := dir.entries[name]
+	if !ok {
 		return syscall.ENOENT
+	}
+
+	dir2, isDir := fs.mem.getDir(entry)
+
+	// make sure isDir matches rmDir
+	if !rmDir && isDir {
+		return syscall.EISDIR
+	}
+	if rmDir && !isDir {
+		return syscall.EINVAL
+	}
+
+	if isDir {
+		// only allow deleting empty directories
+		if len(dir2.entries) > 0 {
+			return syscall.ENOTEMPTY
+		}
 	}
 
 	dOp := &dirOp{
 		parts: []dirOpPart{
 			{
-				dir:  rootInode,
-				name: path,
+				dir:  dirInode,
+				name: name,
 				file: -1,
 			},
 		},
@@ -737,28 +858,48 @@ func (fs *Filesystem) Remove(path string) error {
 	return nil
 }
 
-func (fs *Filesystem) Rename(from, to string) error {
+func (fs *Filesystem) Rename(fromInode int, fromPath string, toInode int, toPath string) error {
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 
-	dir := fs.mem.getDir(rootInode)
-	inode, ok := dir.entries[from]
+	fromInode, fromName, err := fs.walkpath(fromInode, fromPath, true)
+	if err != nil {
+		return err
+	}
+
+	fromDir, ok := fs.mem.getDir(fromInode)
+	if !ok {
+		return syscall.ENOTDIR
+	}
+
+	inode, ok := fromDir.entries[fromName]
 	if !ok {
 		return syscall.ENOENT
 	}
+
+	toInode, toName, err := fs.walkpath(toInode, toPath, true)
+	if err != nil {
+		return err
+	}
+
+	if _, ok := fs.mem.getDir(toInode); !ok {
+		return syscall.ENOTDIR
+	}
+
+	// TODO: prevent cycles?
 
 	// slog.Info("fs rename", "from", from, "to", to, "inode", inode)
 
 	dOp := &dirOp{
 		parts: []dirOpPart{
 			{
-				dir:  rootInode,
-				name: from,
+				dir:  fromInode,
+				name: fromName,
 				file: -1,
 			},
 			{
-				dir:  rootInode,
-				name: to,
+				dir:  toInode,
+				name: toName,
 				file: inode,
 			},
 		},
@@ -768,41 +909,56 @@ func (fs *Filesystem) Rename(from, to string) error {
 	return nil
 }
 
-func (fs *Filesystem) OpenFile(path string, flag int) (int, error) {
+func (fs *Filesystem) OpenFile(dirInode int, path string, flag int) (int, error) {
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 
-	inode, ok := fs.mem.getDir(rootInode).entries[path]
-	if path == "." {
-		// XXX: JANK
-		inode = rootInode
+	dirInode, name, err := fs.walkpath(dirInode, path, true)
+	if err != nil {
+		return 0, err
+	}
+
+	dir, ok := fs.mem.getDir(dirInode)
+	if !ok {
+		return 0, syscall.ENOTDIR
+	}
+
+	var inode int
+	if name != "." {
+		inode, ok = dir.entries[name]
+		if !ok {
+			if flag&os.O_CREATE == 0 {
+				return 0, syscall.ENOENT
+			}
+
+			inode = fs.mem.next
+			op := &allocOp{
+				dir:   false,
+				inode: inode,
+			}
+			fs.apply(op)
+
+			dOp := &dirOp{
+				parts: []dirOpPart{
+					{
+						dir:  dirInode,
+						name: name,
+						file: inode,
+					},
+				},
+			}
+			fs.apply(dOp)
+
+			// slog.Info("fs create", "path", args.Path, "inode", inode)
+		}
+	} else {
+		// janky...
+		// TODO: handle "." everywhere that reads dir, and do it cleanly
+		// TODO: handle "..",
+		inode = dirInode
 		ok = true
 	}
-	if !ok {
-		if flag&os.O_CREATE == 0 {
-			return 0, syscall.ENOENT
-		}
 
-		inode = fs.mem.next
-		op := &allocOp{
-			dir:   false,
-			inode: inode,
-		}
-		fs.apply(op)
-
-		dOp := &dirOp{
-			parts: []dirOpPart{
-				{
-					dir:  rootInode,
-					name: path,
-					file: inode,
-				},
-			},
-		}
-		fs.apply(dOp)
-
-		// slog.Info("fs create", "path", args.Path, "inode", inode)
-	}
 	if ok && flag&os.O_EXCL != 0 {
 		return 0, errors.New("file already existed")
 	}
@@ -842,15 +998,14 @@ type ReadDirEntry struct {
 	IsDir bool
 }
 
-func (fs *Filesystem) ReadDir(name string) ([]ReadDirEntry, error) {
+func (fs *Filesystem) ReadDir(inode int) ([]ReadDirEntry, error) {
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 
-	// XXX: jank
-	if name != "." {
-		return nil, errors.New("bad dir")
+	dir, ok := fs.mem.getDir(inode)
+	if !ok {
+		return nil, syscall.ENOTDIR
 	}
-	dir := fs.mem.getDir(rootInode)
 
 	var entries []ReadDirEntry
 	for name, inode := range dir.entries {
@@ -887,6 +1042,59 @@ func (fs *Filesystem) GetInodeInfo(inode int) InodeInfo {
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 	return fs.getInodeInfoLocked(inode)
+}
+
+func (fs *Filesystem) walkpath(baseInode int, path string, keepLast bool) (inode int, entry string, err error) {
+	if path[0:1] == "/" {
+		baseInode = RootInode
+	}
+
+	inode = baseInode
+	for {
+		for len(path) > 0 && path[0:1] == "/" {
+			path = path[1:]
+		}
+
+		nextSlash := strings.Index(path, "/")
+		var name string
+		if nextSlash == -1 {
+			name = path
+		} else {
+			name = path[:nextSlash]
+		}
+
+		if len(name) == len(path) && keepLast {
+			return inode, name, nil
+		}
+
+		if name == "" {
+			// entire path is empty? assume current dir
+			return inode, "", nil
+		}
+
+		// check it is a dir
+		dir, ok := fs.mem.getDir(inode)
+		if !ok {
+			return 0, "", syscall.ENOTDIR
+		}
+
+		if name == "." {
+			// stay
+			inode = dir.inode
+		} else if name == ".." {
+			// go up
+			inode = dir.parent
+		} else {
+			// check it has
+			entry, ok := dir.entries[name]
+			if !ok {
+				return 0, "", syscall.ENOENT
+			}
+			inode = entry
+		}
+
+		path = path[len(name):]
+	}
 }
 
 // Open a mmap for the given inode. Mmap starts at offset 0.

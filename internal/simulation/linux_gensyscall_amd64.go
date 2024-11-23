@@ -32,6 +32,7 @@ type linuxOSIface interface {
 	PollOpen(fd int, desc syscallabi.ValueView[syscallabi.PollDesc]) (code int)
 	SysAccept4(s int, rsa syscallabi.ValueView[RawSockaddrAny], addrlen syscallabi.ValueView[Socklen], flags int) (fd int, err error)
 	SysBind(s int, addr unsafe.Pointer, addrlen Socklen) (err error)
+	SysChdir(path string) (err error)
 	SysClose(fd int) (err error)
 	SysConnect(s int, addr unsafe.Pointer, addrlen Socklen) (err error)
 	SysFcntl(fd int, cmd int, arg int) (val int, err error)
@@ -40,6 +41,7 @@ type linuxOSIface interface {
 	SysFstat(fd int, stat syscallabi.ValueView[Stat_t]) (err error)
 	SysFsync(fd int) (err error)
 	SysFtruncate(fd int, length int64) (err error)
+	SysGetcwd(buf syscallabi.SliceView[byte]) (n int, err error)
 	SysGetdents64(fd int, buf syscallabi.SliceView[byte]) (n int, err error)
 	SysGetpeername(fd int, rsa syscallabi.ValueView[RawSockaddrAny], addrlen syscallabi.ValueView[Socklen]) (err error)
 	SysGetpid() (pid int)
@@ -48,6 +50,7 @@ type linuxOSIface interface {
 	SysGetsockopt(s int, level int, name int, val unsafe.Pointer, vallen syscallabi.ValueView[Socklen]) (err error)
 	SysListen(s int, n int) (err error)
 	SysMadvise(b syscallabi.SliceView[byte], advice int) (err error)
+	SysMkdirat(dirfd int, path string, mode uint32) (err error)
 	SysMmap(addr uintptr, length uintptr, prot int, flags int, fd int, offset int64) (xaddr uintptr, err error)
 	SysMunmap(addr uintptr, length uintptr) (err error)
 	SysNewfstatat(fd int, path string, stat syscallabi.ValueView[Stat_t], flags int) (err error)
@@ -114,6 +117,13 @@ func (os *LinuxOS) HandleSyscall(syscall *syscallabi.Syscall) {
 		err := os.SysBind(s, addr, addrlen)
 		syscall.Errno = syscallabi.ErrErrno(err)
 		syscall.Complete()
+	case unix.SYS_CHDIR:
+		// called by (for find references):
+		_ = SyscallSysChdir
+		path := syscall.Ptr0.(string)
+		err := os.SysChdir(path)
+		syscall.Errno = syscallabi.ErrErrno(err)
+		syscall.Complete()
 	case unix.SYS_CLOSE:
 		// called by (for find references):
 		_ = SyscallSysClose
@@ -176,6 +186,14 @@ func (os *LinuxOS) HandleSyscall(syscall *syscallabi.Syscall) {
 		fd := int(syscall.Int0)
 		length := int64(syscall.Int1)
 		err := os.SysFtruncate(fd, length)
+		syscall.Errno = syscallabi.ErrErrno(err)
+		syscall.Complete()
+	case unix.SYS_GETCWD:
+		// called by (for find references):
+		_ = SyscallSysGetcwd
+		buf := syscallabi.NewSliceView(syscall.Ptr0.(*byte), syscall.Int0)
+		n, err := os.SysGetcwd(buf)
+		syscall.R0 = uintptr(n)
 		syscall.Errno = syscallabi.ErrErrno(err)
 		syscall.Complete()
 	case unix.SYS_GETDENTS64:
@@ -245,6 +263,15 @@ func (os *LinuxOS) HandleSyscall(syscall *syscallabi.Syscall) {
 		b := syscallabi.NewSliceView(syscall.Ptr0.(*byte), syscall.Int0)
 		advice := int(syscall.Int1)
 		err := os.SysMadvise(b, advice)
+		syscall.Errno = syscallabi.ErrErrno(err)
+		syscall.Complete()
+	case unix.SYS_MKDIRAT:
+		// called by (for find references):
+		_ = SyscallSysMkdirat
+		dirfd := int(syscall.Int0)
+		path := syscall.Ptr1.(string)
+		mode := uint32(syscall.Int2)
+		err := os.SysMkdirat(dirfd, path, mode)
 		syscall.Errno = syscallabi.ErrErrno(err)
 		syscall.Complete()
 	case unix.SYS_MMAP:
@@ -445,6 +472,20 @@ func SyscallSysBind(s int, addr unsafe.Pointer, addrlen Socklen) (err error) {
 }
 
 //go:norace
+func SyscallSysChdir(path string) (err error) {
+	// invokes (for go to definition):
+	_ = (*LinuxOS).SysChdir
+	syscall := syscallabi.GetGoroutineLocalSyscall()
+	syscall.OS = linuxOS
+	syscall.Trap = unix.SYS_CHDIR
+	syscall.Ptr0 = path
+	linuxOS.dispatchSyscall(syscall)
+	err = syscallabi.ErrnoErr(syscall.Errno)
+	syscall.Ptr0 = nil
+	return
+}
+
+//go:norace
 func SyscallSysClose(fd int) (err error) {
 	// invokes (for go to definition):
 	_ = (*LinuxOS).SysClose
@@ -555,6 +596,21 @@ func SyscallSysFtruncate(fd int, length int64) (err error) {
 	syscall.Int1 = uintptr(length)
 	linuxOS.dispatchSyscall(syscall)
 	err = syscallabi.ErrnoErr(syscall.Errno)
+	return
+}
+
+//go:norace
+func SyscallSysGetcwd(buf []byte) (n int, err error) {
+	// invokes (for go to definition):
+	_ = (*LinuxOS).SysGetcwd
+	syscall := syscallabi.GetGoroutineLocalSyscall()
+	syscall.OS = linuxOS
+	syscall.Trap = unix.SYS_GETCWD
+	syscall.Ptr0, syscall.Int0 = unsafe.SliceData(buf), uintptr(len(buf))
+	linuxOS.dispatchSyscall(syscall)
+	n = int(syscall.R0)
+	err = syscallabi.ErrnoErr(syscall.Errno)
+	syscall.Ptr0 = nil
 	return
 }
 
@@ -681,6 +737,22 @@ func SyscallSysMadvise(b []byte, advice int) (err error) {
 	linuxOS.dispatchSyscall(syscall)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	syscall.Ptr0 = nil
+	return
+}
+
+//go:norace
+func SyscallSysMkdirat(dirfd int, path string, mode uint32) (err error) {
+	// invokes (for go to definition):
+	_ = (*LinuxOS).SysMkdirat
+	syscall := syscallabi.GetGoroutineLocalSyscall()
+	syscall.OS = linuxOS
+	syscall.Trap = unix.SYS_MKDIRAT
+	syscall.Int0 = uintptr(dirfd)
+	syscall.Ptr1 = path
+	syscall.Int2 = uintptr(mode)
+	linuxOS.dispatchSyscall(syscall)
+	err = syscallabi.ErrnoErr(syscall.Errno)
+	syscall.Ptr1 = nil
 	return
 }
 
@@ -907,6 +979,8 @@ func IsHandledSyscall(trap uintptr) bool {
 		return true
 	case unix.SYS_BIND:
 		return true
+	case unix.SYS_CHDIR:
+		return true
 	case unix.SYS_CLOSE:
 		return true
 	case unix.SYS_CONNECT:
@@ -923,6 +997,8 @@ func IsHandledSyscall(trap uintptr) bool {
 		return true
 	case unix.SYS_FTRUNCATE:
 		return true
+	case unix.SYS_GETCWD:
+		return true
 	case unix.SYS_GETDENTS64:
 		return true
 	case unix.SYS_GETPEERNAME:
@@ -938,6 +1014,8 @@ func IsHandledSyscall(trap uintptr) bool {
 	case unix.SYS_LISTEN:
 		return true
 	case unix.SYS_MADVISE:
+		return true
+	case unix.SYS_MKDIRAT:
 		return true
 	case unix.SYS_MMAP:
 		return true

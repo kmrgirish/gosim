@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"reflect"
 	"syscall"
 	"testing"
@@ -957,6 +958,109 @@ func TestMmapBasic(t *testing.T) {
 
 	if got := string(data[2048-3 : 2048-3+8]); got != "\x00\x00\x00\x00\x00\x00\x00\x00" {
 		t.Errorf("expected zeroes, got %q", got)
+	}
+}
+
+func TestDiskDirBasic(t *testing.T) {
+	setupRealDisk(t)
+
+	if err := os.Mkdir("foo", 0o755); err != nil {
+		t.Error(err)
+	}
+
+	if err := os.WriteFile("foo/bar", []byte("baz"), 0o644); err != nil {
+		t.Error(err)
+	}
+
+	bytes, err := os.ReadFile("foo/bar")
+	if err != nil {
+		t.Error(err)
+	}
+	if string(bytes) != "baz" {
+		t.Errorf("unexpected read %q", string(bytes))
+	}
+
+	if _, err := os.ReadFile("foo/bar/baz"); !errors.Is(err, syscall.ENOTDIR) {
+		t.Error(err)
+	}
+	if _, err := os.ReadFile("foo/bar/baz/bah"); !errors.Is(err, syscall.ENOTDIR) {
+		t.Error(err)
+	}
+
+	checkReadDir(t, ".", []dirEntry{
+		{
+			Name:  "foo",
+			IsDir: true,
+		},
+	})
+
+	checkReadDir(t, "foo", []dirEntry{
+		{
+			Name:  "bar",
+			IsDir: false,
+		},
+	})
+
+	before, err := os.Getwd()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if err := os.Chdir("foo"); err != nil {
+		t.Error(err)
+	}
+
+	after, err := os.Getwd()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if filepath.Join(before, "foo") != after {
+		t.Error(before, filepath.Join(before, "foo"), after)
+	}
+
+	if err := os.Rename("../foo", "../huh"); err != nil {
+		t.Error(err)
+	}
+
+	after2, err := os.Getwd()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if filepath.Join(before, "huh") != after2 {
+		t.Error(before, filepath.Join(before, "huh"), after2)
+	}
+
+	bytes, err = os.ReadFile("bar")
+	if err != nil {
+		t.Error(err)
+	}
+	if string(bytes) != "baz" {
+		t.Errorf("unexpected read %q", string(bytes))
+	}
+
+	checkReadDir(t, ".", []dirEntry{
+		{
+			Name:  "bar",
+			IsDir: false,
+		},
+	})
+
+	if err := os.Chdir(".."); err != nil {
+		t.Error(err)
+	}
+
+	if err := os.Remove("huh"); !errors.Is(err, syscall.ENOTEMPTY) {
+		t.Error(err)
+	}
+
+	if err := os.Remove("huh/bar"); err != nil {
+		t.Error(err)
+	}
+
+	if err := os.Remove("huh"); err != nil {
+		t.Error(err)
 	}
 }
 

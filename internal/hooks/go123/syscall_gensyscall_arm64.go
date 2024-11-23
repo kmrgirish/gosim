@@ -20,6 +20,10 @@ func Syscall_bind(s int, addr unsafe.Pointer, addrlen simulation.Socklen) (err e
 	return simulation.SyscallSysBind(s, addr, addrlen)
 }
 
+func Syscall_Chdir(path string) (err error) {
+	return simulation.SyscallSysChdir(path)
+}
+
 func Syscall_Close(fd int) (err error) {
 	return simulation.SyscallSysClose(fd)
 }
@@ -56,6 +60,10 @@ func Syscall_Ftruncate(fd int, length int64) (err error) {
 	return simulation.SyscallSysFtruncate(fd, length)
 }
 
+func Syscall_Getcwd(buf []byte) (n int, err error) {
+	return simulation.SyscallSysGetcwd(buf)
+}
+
 func Syscall_Getdents(fd int, buf []byte) (n int, err error) {
 	return simulation.SyscallSysGetdents64(fd, buf)
 }
@@ -82,6 +90,10 @@ func Syscall_Listen(s int, n int) (err error) {
 
 func Syscall_Madvise(b []byte, advice int) (err error) {
 	return simulation.SyscallSysMadvise(b, advice)
+}
+
+func Syscall_Mkdirat(dirfd int, path string, mode uint32) (err error) {
+	return simulation.SyscallSysMkdirat(dirfd, path, mode)
 }
 
 func Syscall_mmap(addr uintptr, length uintptr, prot int, flags int, fd int, offset int64) (xaddr uintptr, err error) {

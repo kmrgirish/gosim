@@ -35,6 +35,8 @@ type LinuxOS struct {
 	nextFd int
 
 	mmaps map[uintptr]*fs.Mmap
+
+	workdirInode int
 }
 
 func NewLinuxOS(simulation *Simulation, machine *Machine, dispatcher syscallabi.Dispatcher) *LinuxOS {
@@ -49,6 +51,8 @@ func NewLinuxOS(simulation *Simulation, machine *Machine, dispatcher syscallabi.
 		nextFd: 5,
 
 		mmaps: make(map[uintptr]*fs.Mmap),
+
+		workdirInode: fs.RootInode,
 	}
 }
 
@@ -193,8 +197,12 @@ type Socket struct {
 	// tcp conn
 }
 
-// persist dir:
-// all links into this dir we persist
+func (l *LinuxOS) dirInodeForFd(dirfd int) (int, error) {
+	if dirfd != _AT_FDCWD {
+		return 0, syscall.EINVAL // XXX?
+	}
+	return l.workdirInode, nil
+}
 
 func (l *LinuxOS) SysOpenat(dirfd int, path string, flags int, mode uint32) (int, error) {
 	l.mu.Lock()
@@ -203,8 +211,9 @@ func (l *LinuxOS) SysOpenat(dirfd int, path string, flags int, mode uint32) (int
 		return 0, syscall.EINVAL
 	}
 
-	if dirfd != _AT_FDCWD {
-		return 0, syscall.EINVAL // XXX?
+	dirInode, err := l.dirInodeForFd(dirfd)
+	if err != nil {
+		return 0, err
 	}
 
 	// just get rid of this
@@ -235,12 +244,9 @@ func (l *LinuxOS) SysOpenat(dirfd int, path string, flags int, mode uint32) (int
 		flagRead = true
 	}
 
-	inode, err := l.machine.filesystem.OpenFile(path, flags)
+	inode, err := l.machine.filesystem.OpenFile(dirInode, path, flags)
 	if err != nil {
-		if err == syscall.ENOENT {
-			return 0, syscall.ENOENT
-		}
-		return 0, syscall.EINVAL // XXX
+		return 0, err
 	}
 
 	// TODO: add reference here? or in OpenFile? help this is strange.
@@ -270,15 +276,16 @@ func (l *LinuxOS) SysRenameat(olddirfd int, oldpath string, newdirfd int, newpat
 
 	logf("renameat %d %s %d %s", olddirfd, oldpath, newdirfd, newpath)
 
-	if olddirfd != _AT_FDCWD {
-		return syscall.EINVAL // XXX?
+	oldInode, err := l.dirInodeForFd(olddirfd)
+	if err != nil {
+		return err
+	}
+	newInode, err := l.dirInodeForFd(newdirfd)
+	if err != nil {
+		return err
 	}
 
-	if newdirfd != _AT_FDCWD {
-		return syscall.EINVAL // XXX?
-	}
-
-	if err := l.machine.filesystem.Rename(oldpath, newpath); err != nil {
+	if err := l.machine.filesystem.Rename(oldInode, oldpath, newInode, newpath); err != nil {
 		if err == syscall.ENOENT {
 			return syscall.ENOENT
 		}
@@ -311,7 +318,7 @@ func (l *LinuxOS) SysGetdents64(fd int, data syscallabi.ByteSliceView) (int, err
 		return 0, nil
 	}
 
-	entries, err := l.machine.filesystem.ReadDir(f.name)
+	entries, err := l.machine.filesystem.ReadDir(f.inode)
 	if err != nil {
 		return 0, syscall.EINVAL // XXX?
 	}
@@ -632,8 +639,9 @@ func (l *LinuxOS) SysFstatat(dirfd int, path string, statBuf syscallabi.ValueVie
 		return syscall.EINVAL
 	}
 
-	if dirfd != _AT_FDCWD {
-		return syscall.EINVAL // XXX?
+	dirInode, err := l.dirInodeForFd(dirfd)
+	if err != nil {
+		return err
 	}
 
 	if flags != 0 {
@@ -642,7 +650,7 @@ func (l *LinuxOS) SysFstatat(dirfd int, path string, statBuf syscallabi.ValueVie
 
 	logf("fstatat %d %s %d", dirfd, path, flags)
 
-	fsStat, err := l.machine.filesystem.Stat(path)
+	fsStat, err := l.machine.filesystem.Stat(dirInode, path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return syscall.ENOENT
@@ -667,32 +675,24 @@ func (l *LinuxOS) SysUnlinkat(dirfd int, path string, flags int) error {
 		return syscall.EINVAL
 	}
 
-	if dirfd != _AT_FDCWD {
-		return syscall.EINVAL // XXX?
+	dirInode, err := l.dirInodeForFd(dirfd)
+	if err != nil {
+		return err
 	}
 
 	logf("unlinkat %d %s %d", dirfd, path, flags)
 
 	switch flags {
 	case 0:
-		if err := l.machine.filesystem.Remove(path); err != nil {
-			if err == syscall.ENOENT {
-				return syscall.ENOENT
-			}
-			return syscall.EINVAL
+		if err := l.machine.filesystem.Remove(dirInode, path, false); err != nil {
+			return err
 		}
 		return nil
 	case _AT_REMOVEDIR:
-		// XXX: should special case dir vs file and also ENOTDIR
-		if err := l.machine.filesystem.Remove(path); err != nil {
-			if errors.Is(err, os.ErrNotExist) {
-				return syscall.ENOENT
-			}
-			return syscall.EINVAL
+		if err := l.machine.filesystem.Remove(dirInode, path, true); err != nil {
+			return err
 		}
-
 		return nil
-
 	default:
 		return syscall.EINVAL
 	}
@@ -1061,6 +1061,66 @@ func (l *LinuxOS) SysGetsockname(fd int, rsa syscallabi.ValueView[RawSockaddrAny
 	default:
 		return syscall.EBADFD
 	}
+}
+
+func (l *LinuxOS) SysChdir(path string) (err error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.shutdown {
+		return syscall.EINVAL
+	}
+
+	logf("chdir %s", path)
+
+	newDirinode, err := l.machine.filesystem.Getdirinode(l.workdirInode, path)
+	if err != nil {
+		return err
+	}
+	l.workdirInode = newDirinode
+
+	return nil
+}
+
+func (l *LinuxOS) SysGetcwd(buf syscallabi.SliceView[byte]) (n int, err error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.shutdown {
+		return 0, syscall.EINVAL
+	}
+
+	logf("getcwd")
+
+	s, err := l.machine.filesystem.Getpath(l.workdirInode)
+	if err != nil {
+		return 0, err
+	}
+
+	if len(s)+1 > buf.Len() {
+		// help
+		return 0, syscall.EINVAL
+	}
+
+	n = buf.Write([]byte(s))
+	var zero [1]byte
+	n += buf.Slice(n, n+1).Write(zero[:])
+	return n, nil
+}
+
+func (l *LinuxOS) SysMkdirat(dirfd int, path string, mode uint32) (err error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.shutdown {
+		return syscall.EINVAL
+	}
+
+	logf("mkdirat %d %s %d", dirfd, path, mode)
+
+	dirInode, err := l.dirInodeForFd(dirfd)
+	if err != nil {
+		return err
+	}
+
+	return l.machine.filesystem.Mkdir(dirInode, path)
 }
 
 func (l *LinuxOS) SysGetpeername(fd int, rsa syscallabi.ValueView[RawSockaddrAny], len syscallabi.ValueView[Socklen]) error {
