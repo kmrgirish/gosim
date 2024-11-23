@@ -79,6 +79,8 @@ var globalsDontTranslateGo123 = map[packageSelector]bool{
 	{Pkg: "crypto/sha256", Selector: "useAVX2"}:                               true,
 	{Pkg: "vendor/golang.org/x/crypto/chacha20poly1305", Selector: "useAVX2"}: true,
 	{Pkg: "crypto/internal/bigmod", Selector: "supportADX"}:                   true,
+
+	{Pkg: "github.com/cespare/xxhash/v2", Selector: "primes"}: true,
 }
 
 func (t *globalsCollector) collectGlobalsDecl(genDecl *dst.GenDecl) {

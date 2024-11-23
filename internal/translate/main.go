@@ -75,6 +75,8 @@ var keepAsmPackagesGo123 = map[string]bool{
 
 	"net/url":  true, // XXX: linkname setpath nonsense
 	"net/http": true, // XXX: linkname roundtrip nonsense
+
+	"github.com/cespare/xxhash/v2": true,
 }
 
 var PublicExportHacks = map[string][]string{
