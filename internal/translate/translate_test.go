@@ -196,7 +196,7 @@ func TestTranslate(t *testing.T) {
 
 		desiredFiles := desiredFilesByPackage[pkgName]
 
-		slices.SortFunc(desiredFiles, func(a, b txtar.File) int {
+		slices.SortStableFunc(desiredFiles, func(a, b txtar.File) int {
 			plainA := strings.TrimPrefix(a.Name, "translated/"+pkgName+"/")
 			plainB := strings.TrimPrefix(b.Name, "translated/"+pkgName+"/")
 			return cmp.Compare(plainA, plainB)

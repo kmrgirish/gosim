@@ -214,18 +214,20 @@ func (t *packageTranslator) rewriteMapLiteral(c *dstutil.Cursor) {
 			}
 
 			c.Replace(t.maybeConvertMapType(&dst.CallExpr{
-				Fun: &dst.SelectorExpr{
-					X: &dst.CompositeLit{
-						Type: &dst.IndexListExpr{
-							X: t.newRuntimeSelector("MapLiteral"),
-							Indices: []dst.Expr{
-								t.makeTypeExpr(typ.Type.Key()),
-								t.makeTypeExpr(typ.Type.Elem()),
+				Fun: t.newRuntimeSelector("MapLiteral"),
+				Args: []dst.Expr{
+					&dst.CompositeLit{
+						Type: &dst.ArrayType{
+							Elt: &dst.IndexListExpr{
+								X: t.newRuntimeSelector("KV"),
+								Indices: []dst.Expr{
+									t.makeTypeExpr(typ.Type.Key()),
+									t.makeTypeExpr(typ.Type.Elem()),
+								},
 							},
 						},
 						Elts: pairs,
 					},
-					Sel: dst.NewIdent("Build"),
 				},
 			}, typ))
 		}

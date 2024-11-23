@@ -61,15 +61,13 @@ func ExtractMap[M ~struct{ Impl *mapImpl[K, V] }, K comparable, V any](m M) Map[
 	return Map[K, V](m)
 }
 
-// A MapLiteral is a slice of key-value pairs that can be converted into a Map.
-type MapLiteral[K comparable, V any] []KV[K, V]
-
 type KV[K comparable, V any] struct {
 	K K
 	V V
 }
 
-func (pairs MapLiteral[K, V]) Build() Map[K, V] {
+// MapLiteral builds a Map from a slice of key-value pairs.
+func MapLiteral[K comparable, V any](pairs []KV[K, V]) Map[K, V] {
 	m := NewMap[K, V]()
 	for _, pair := range pairs {
 		m.Set(pair.K, pair.V)

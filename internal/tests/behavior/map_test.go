@@ -777,3 +777,29 @@ func TestMapClear(t *testing.T) {
 		t.Error("bad get")
 	}
 }
+
+func TestMapLiteralRange(t *testing.T) {
+	var seen []pair
+
+	for k, v := range map[int]int{
+		1: 3,
+		2: 5,
+		3: 8,
+	} {
+		seen = append(seen, pair{key: k, value: v})
+	}
+
+	slices.SortFunc(seen, func(a pair, b pair) int {
+		return cmp.Compare(a.key, b.key)
+	})
+
+	expected := []pair{
+		{key: 1, value: 3},
+		{key: 2, value: 5},
+		{key: 3, value: 8},
+	}
+
+	if !reflect.DeepEqual(seen, expected) {
+		t.Error("bad", seen, expected)
+	}
+}

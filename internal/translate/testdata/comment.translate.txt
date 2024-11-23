@@ -44,10 +44,10 @@ func Mapcomment() {
 	// yay
 
 	// hurray
-	m = gosimruntime.MapLiteral[string, string]{
+	m = gosimruntime.MapLiteral([]gosimruntime.KV[string, string]{
 		{K: "foo", V: "ok"},  // ok
 		{K: "bar", V: "bar"}, // yes
-	}.Build() // mm
+	}) // mm
 }
 -- selectcomment.go --
 package gosimcomment
