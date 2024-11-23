@@ -62,6 +62,8 @@ var hooksGo123 = map[packageSelector]packageSelector{
 
 	{Pkg: "internal/syscall/unix", Selector: "GetRandom"}: {Pkg: hooksGo123Package},
 	{Pkg: "internal/syscall/unix", Selector: "fcntl"}:     {Pkg: hooksGo123Package},
+	{Pkg: "internal/syscall/unix", Selector: "Openat"}:    {Pkg: hooksGo123Package},
+	{Pkg: "internal/syscall/unix", Selector: "Unlinkat"}:  {Pkg: hooksGo123Package},
 
 	{Pkg: "iter", Selector: "coroswitch"}: {Pkg: hooksGo123Package},
 	{Pkg: "iter", Selector: "newcoro"}:    {Pkg: hooksGo123Package},
@@ -181,6 +183,8 @@ var hooksGo123 = map[packageSelector]packageSelector{
 	{Pkg: "syscall", Selector: "runtime_entersyscall"}:        {Pkg: hooksGo123Package},
 	{Pkg: "syscall", Selector: "runtime_envs"}:                {Pkg: hooksGo123Package},
 	{Pkg: "syscall", Selector: "runtime_exitsyscall"}:         {Pkg: hooksGo123Package},
+
+	{Pkg: "syscall", Selector: "FcntlFlock"}: {Pkg: hooksGo123Package},
 
 	// amd64 only?
 	{Pkg: "syscall", Selector: "gettimeofday"}: {Pkg: hooksGo123Package},
