@@ -842,3 +842,23 @@ func TestMapAliasConversions(t *testing.T) {
 		t.Error("bad", seen, expected)
 	}
 }
+
+func TestMapMultiAssign(t *testing.T) {
+	m := make(map[int]string)
+
+	var foo string
+	m[1], m[2], m[3], foo = "4", "5", "6", "7"
+
+	if m[1] != "4" {
+		t.Errorf("expected 4, got %s", m[1])
+	}
+	if m[2] != "5" {
+		t.Errorf("expected 5, got %s", m[2])
+	}
+	if m[3] != "6" {
+		t.Errorf("expected 6, got %s", m[3])
+	}
+	if foo != "7" {
+		t.Errorf("expected 7, got %s", foo)
+	}
+}

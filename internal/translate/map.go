@@ -345,6 +345,7 @@ type mapModifyInfo struct {
 type mapAssignInfo struct {
 	mapModify func(op token.Token, val dst.Expr) mapModifyInfo
 	mapSet    func(val dst.Expr) dst.Expr
+	mapType   MapType
 }
 
 func (t *packageTranslator) isMapAssign(lhs dst.Expr) (mapAssignInfo, bool) {
@@ -396,6 +397,7 @@ func (t *packageTranslator) isMapAssign(lhs dst.Expr) (mapAssignInfo, bool) {
 					},
 				}
 			},
+			mapType: wrapped,
 		}, true
 	}
 	return mapAssignInfo{}, false
@@ -411,17 +413,16 @@ func (t *packageTranslator) rewriteMapAssign(c *dstutil.Cursor) {
 				hasAnySpecial = true
 			}
 		}
-		if hasAnySpecial && len(assignStmt.Lhs) > 1 {
-			// XXX: could fix this by introducing temp values and then doing sets right after...
-			log.Fatal("do not support map or global assign to multiple values...")
-		}
 		if !hasAnySpecial {
 			return
 		}
 
-		info, _ := t.isMapAssign(assignStmt.Lhs[0])
-
 		if op, ok := isOpAssign(assignStmt.Tok); ok {
+			if len(assignStmt.Lhs) != 1 || len(assignStmt.Rhs) != 1 {
+				panic("special assign with multiple lhs or rhs?")
+			}
+
+			info, _ := t.isMapAssign(assignStmt.Lhs[0])
 			info2 := info.mapModify(op, assignStmt.Rhs[0])
 			c.InsertBefore(info2.copyVarsStmt)
 			c.Replace(&dst.ExprStmt{
@@ -431,12 +432,45 @@ func (t *packageTranslator) rewriteMapAssign(c *dstutil.Cursor) {
 				X: info2.writeExpr,
 			})
 		} else {
-			c.Replace(&dst.ExprStmt{
-				Decs: dst.ExprStmtDecorations{
-					NodeDecs: assignStmt.Decs.NodeDecs,
-				},
-				X: info.mapSet(assignStmt.Rhs[0]),
-			})
+			if len(assignStmt.Lhs) == 1 {
+				info, _ := t.isMapAssign(assignStmt.Lhs[0])
+				c.Replace(&dst.ExprStmt{
+					Decs: dst.ExprStmtDecorations{
+						NodeDecs: assignStmt.Decs.NodeDecs,
+					},
+					X: info.mapSet(assignStmt.Rhs[0]),
+				})
+			} else {
+				if assignStmt.Tok != token.ASSIGN {
+					panic("non-name on left side of := ?")
+				}
+
+				for i, lhs := range assignStmt.Lhs {
+					if info, ok := t.isMapAssign(lhs); ok {
+						tmp := "val" + t.suffix()
+						c.InsertBefore(&dst.DeclStmt{
+							Decl: &dst.GenDecl{
+								Tok: token.VAR,
+								Specs: []dst.Spec{
+									&dst.ValueSpec{
+										Names: []*dst.Ident{
+											dst.NewIdent(tmp),
+										},
+										Type: t.makeTypeExpr(info.mapType.Type.Elem()),
+									},
+								},
+							},
+						})
+						assignStmt.Lhs[i] = dst.NewIdent(tmp)
+						c.InsertAfter(&dst.ExprStmt{
+							Decs: dst.ExprStmtDecorations{
+								NodeDecs: assignStmt.Decs.NodeDecs,
+							},
+							X: info.mapSet(dst.NewIdent(tmp)),
+						})
+					}
+				}
+			}
 		}
 	}
 

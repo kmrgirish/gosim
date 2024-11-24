@@ -147,6 +147,7 @@ func loadPackages(patterns []string, b gosimtool.BuildConfig, mode packages.Load
 	// check for errors
 	for _, pkg := range packages {
 		if pkg.Errors != nil {
+			// TODO: ignore errors in tests outside of what we care about?
 			log.Println("errors for ", pkg.PkgPath)
 			for _, err := range pkg.Errors {
 				log.Println(err)
