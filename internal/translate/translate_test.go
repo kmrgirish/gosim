@@ -243,7 +243,7 @@ func TestRenameFile(t *testing.T) {
 		},
 		{
 			in:  "foo/bar_linux_test.go",
-			out: "foo/bar_linux_test_.go",
+			out: "foo/bar_linux__test.go",
 		},
 		{
 			in:  "foo/bar_linux_amd64.go",
@@ -251,7 +251,7 @@ func TestRenameFile(t *testing.T) {
 		},
 		{
 			in:  "foo/bar_linux_amd64_test.go",
-			out: "foo/bar_linux_amd64_test_.go",
+			out: "foo/bar_linux_amd64__test.go",
 		},
 		{
 			in:  "foo/bar_amd64.go",

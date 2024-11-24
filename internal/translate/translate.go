@@ -112,6 +112,9 @@ func renameFile(cfg gosimtool.BuildConfig, filePath string) string {
 
 	// for now, after translate all files should be included in the build
 	// modify the filename minimally to neuter any excluded files
+	if strings.HasSuffix(withoutDot, "_test") {
+		return strings.TrimSuffix(withoutDot, "_test") + "__test" + ext
+	}
 	return withoutDot + "_" + ext
 }
 
