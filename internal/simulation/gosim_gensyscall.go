@@ -55,128 +55,10 @@ func (os *GosimOS) dispatchSyscall(s *syscallabi.Syscall) {
 }
 
 //go:norace
-func (os *GosimOS) HandleSyscall(syscall *syscallabi.Syscall) {
-	switch syscall.Trap {
-	case 1011:
-		// called by (for find references):
-		_ = SyscallMachineGetLabel
-		machineID := int(syscall.Int0)
-		label, err := os.MachineGetLabel(machineID)
-		syscall.RPtr0 = label
-		syscall.Errno = syscallabi.ErrErrno(err)
-		syscall.Complete()
-	case 1005:
-		// called by (for find references):
-		_ = SyscallMachineInodeInfo
-		machineID := int(syscall.Int0)
-		inodeID := int(syscall.Int1)
-		info := syscallabi.NewValueView(syscall.Ptr2.(*fs.InodeInfo))
-		os.MachineInodeInfo(machineID, inodeID, info)
-		syscall.Complete()
-	case 1003:
-		// called by (for find references):
-		_ = SyscallMachineNew
-		label := syscall.Ptr0.(string)
-		addr := syscall.Ptr1.(string)
-		program := syscall.Ptr2.(any)
-		machineID := os.MachineNew(label, addr, program)
-		syscall.R0 = uintptr(machineID)
-		syscall.Complete()
-	case 1007:
-		// called by (for find references):
-		_ = SyscallMachineRecoverInit
-		machineID := int(syscall.Int0)
-		program := syscall.Ptr1.(any)
-		iterID := os.MachineRecoverInit(machineID, program)
-		syscall.R0 = uintptr(iterID)
-		syscall.Complete()
-	case 1008:
-		// called by (for find references):
-		_ = SyscallMachineRecoverNext
-		iterID := int(syscall.Int0)
-		machineID, ok := os.MachineRecoverNext(iterID)
-		syscall.R0 = uintptr(machineID)
-		syscall.R1 = syscallabi.BoolToUintptr(ok)
-		syscall.Complete()
-	case 1009:
-		// called by (for find references):
-		_ = SyscallMachineRecoverRelease
-		iterID := int(syscall.Int0)
-		os.MachineRecoverRelease(iterID)
-		syscall.Complete()
-	case 1010:
-		// called by (for find references):
-		_ = SyscallMachineRestart
-		machineID := int(syscall.Int0)
-		partialDisk := syscallabi.BoolFromUintptr(syscall.Int1)
-		err := os.MachineRestart(machineID, partialDisk)
-		syscall.Errno = syscallabi.ErrErrno(err)
-		syscall.Complete()
-	case 1012:
-		// called by (for find references):
-		_ = SyscallMachineSetBootProgram
-		machineID := int(syscall.Int0)
-		program := syscall.Ptr1.(any)
-		err := os.MachineSetBootProgram(machineID, program)
-		syscall.Errno = syscallabi.ErrErrno(err)
-		syscall.Complete()
-	case 1013:
-		// called by (for find references):
-		_ = SyscallMachineSetSometimesCrashOnSync
-		machineID := int(syscall.Int0)
-		crash := syscallabi.BoolFromUintptr(syscall.Int1)
-		err := os.MachineSetSometimesCrashOnSync(machineID, crash)
-		syscall.Errno = syscallabi.ErrErrno(err)
-		syscall.Complete()
-	case 1004:
-		// called by (for find references):
-		_ = SyscallMachineStop
-		machineID := int(syscall.Int0)
-		graceful := syscallabi.BoolFromUintptr(syscall.Int1)
-		os.MachineStop(machineID, graceful)
-		syscall.Complete()
-	case 1006:
-		// called by (for find references):
-		_ = SyscallMachineWait
-		machineID := int(syscall.Int0)
-		os.MachineWait(machineID, syscall)
-	case 1001:
-		// called by (for find references):
-		_ = SyscallSetConnected
-		a := syscall.Ptr0.(string)
-		b := syscall.Ptr1.(string)
-		connected := syscallabi.BoolFromUintptr(syscall.Int2)
-		err := os.SetConnected(a, b, connected)
-		syscall.Errno = syscallabi.ErrErrno(err)
-		syscall.Complete()
-	case 1002:
-		// called by (for find references):
-		_ = SyscallSetDelay
-		a := syscall.Ptr0.(string)
-		b := syscall.Ptr1.(string)
-		delay := time.Duration(syscall.Int2)
-		err := os.SetDelay(a, b, delay)
-		syscall.Errno = syscallabi.ErrErrno(err)
-		syscall.Complete()
-	case 1000:
-		// called by (for find references):
-		_ = SyscallSetSimulationTimeout
-		timeout := time.Duration(syscall.Int0)
-		err := os.SetSimulationTimeout(timeout)
-		syscall.Errno = syscallabi.ErrErrno(err)
-		syscall.Complete()
-	default:
-		panic("bad")
-	}
-}
-
-//go:norace
 func SyscallMachineGetLabel(machineID int) (label string, err error) {
-	// invokes (for go to definition):
-	_ = (*GosimOS).MachineGetLabel
 	syscall := syscallabi.GetGoroutineLocalSyscall()
+	syscall.Trampoline = trampolineMachineGetLabel
 	syscall.OS = gosimOS
-	syscall.Trap = 1011
 	syscall.Int0 = uintptr(machineID)
 	gosimOS.dispatchSyscall(syscall)
 	label = syscall.RPtr0.(string)
@@ -185,12 +67,19 @@ func SyscallMachineGetLabel(machineID int) (label string, err error) {
 }
 
 //go:norace
+func trampolineMachineGetLabel(syscall *syscallabi.Syscall) {
+	machineID := int(syscall.Int0)
+	label, err := syscall.OS.(*GosimOS).MachineGetLabel(machineID)
+	syscall.RPtr0 = label
+	syscall.Errno = syscallabi.ErrErrno(err)
+	syscall.Complete()
+}
+
+//go:norace
 func SyscallMachineInodeInfo(machineID int, inodeID int, info *fs.InodeInfo) {
-	// invokes (for go to definition):
-	_ = (*GosimOS).MachineInodeInfo
 	syscall := syscallabi.GetGoroutineLocalSyscall()
+	syscall.Trampoline = trampolineMachineInodeInfo
 	syscall.OS = gosimOS
-	syscall.Trap = 1005
 	syscall.Int0 = uintptr(machineID)
 	syscall.Int1 = uintptr(inodeID)
 	syscall.Ptr2 = info
@@ -200,12 +89,19 @@ func SyscallMachineInodeInfo(machineID int, inodeID int, info *fs.InodeInfo) {
 }
 
 //go:norace
+func trampolineMachineInodeInfo(syscall *syscallabi.Syscall) {
+	machineID := int(syscall.Int0)
+	inodeID := int(syscall.Int1)
+	info := syscallabi.NewValueView(syscall.Ptr2.(*fs.InodeInfo))
+	syscall.OS.(*GosimOS).MachineInodeInfo(machineID, inodeID, info)
+	syscall.Complete()
+}
+
+//go:norace
 func SyscallMachineNew(label string, addr string, program any) (machineID int) {
-	// invokes (for go to definition):
-	_ = (*GosimOS).MachineNew
 	syscall := syscallabi.GetGoroutineLocalSyscall()
+	syscall.Trampoline = trampolineMachineNew
 	syscall.OS = gosimOS
-	syscall.Trap = 1003
 	syscall.Ptr0 = label
 	syscall.Ptr1 = addr
 	syscall.Ptr2 = program
@@ -218,12 +114,20 @@ func SyscallMachineNew(label string, addr string, program any) (machineID int) {
 }
 
 //go:norace
+func trampolineMachineNew(syscall *syscallabi.Syscall) {
+	label := syscall.Ptr0.(string)
+	addr := syscall.Ptr1.(string)
+	program := syscall.Ptr2.(any)
+	machineID := syscall.OS.(*GosimOS).MachineNew(label, addr, program)
+	syscall.R0 = uintptr(machineID)
+	syscall.Complete()
+}
+
+//go:norace
 func SyscallMachineRecoverInit(machineID int, program any) (iterID int) {
-	// invokes (for go to definition):
-	_ = (*GosimOS).MachineRecoverInit
 	syscall := syscallabi.GetGoroutineLocalSyscall()
+	syscall.Trampoline = trampolineMachineRecoverInit
 	syscall.OS = gosimOS
-	syscall.Trap = 1007
 	syscall.Int0 = uintptr(machineID)
 	syscall.Ptr1 = program
 	gosimOS.dispatchSyscall(syscall)
@@ -233,12 +137,19 @@ func SyscallMachineRecoverInit(machineID int, program any) (iterID int) {
 }
 
 //go:norace
+func trampolineMachineRecoverInit(syscall *syscallabi.Syscall) {
+	machineID := int(syscall.Int0)
+	program := syscall.Ptr1.(any)
+	iterID := syscall.OS.(*GosimOS).MachineRecoverInit(machineID, program)
+	syscall.R0 = uintptr(iterID)
+	syscall.Complete()
+}
+
+//go:norace
 func SyscallMachineRecoverNext(iterID int) (machineID int, ok bool) {
-	// invokes (for go to definition):
-	_ = (*GosimOS).MachineRecoverNext
 	syscall := syscallabi.GetGoroutineLocalSyscall()
+	syscall.Trampoline = trampolineMachineRecoverNext
 	syscall.OS = gosimOS
-	syscall.Trap = 1008
 	syscall.Int0 = uintptr(iterID)
 	gosimOS.dispatchSyscall(syscall)
 	machineID = int(syscall.R0)
@@ -247,24 +158,36 @@ func SyscallMachineRecoverNext(iterID int) (machineID int, ok bool) {
 }
 
 //go:norace
+func trampolineMachineRecoverNext(syscall *syscallabi.Syscall) {
+	iterID := int(syscall.Int0)
+	machineID, ok := syscall.OS.(*GosimOS).MachineRecoverNext(iterID)
+	syscall.R0 = uintptr(machineID)
+	syscall.R1 = syscallabi.BoolToUintptr(ok)
+	syscall.Complete()
+}
+
+//go:norace
 func SyscallMachineRecoverRelease(iterID int) {
-	// invokes (for go to definition):
-	_ = (*GosimOS).MachineRecoverRelease
 	syscall := syscallabi.GetGoroutineLocalSyscall()
+	syscall.Trampoline = trampolineMachineRecoverRelease
 	syscall.OS = gosimOS
-	syscall.Trap = 1009
 	syscall.Int0 = uintptr(iterID)
 	gosimOS.dispatchSyscall(syscall)
 	return
 }
 
 //go:norace
+func trampolineMachineRecoverRelease(syscall *syscallabi.Syscall) {
+	iterID := int(syscall.Int0)
+	syscall.OS.(*GosimOS).MachineRecoverRelease(iterID)
+	syscall.Complete()
+}
+
+//go:norace
 func SyscallMachineRestart(machineID int, partialDisk bool) (err error) {
-	// invokes (for go to definition):
-	_ = (*GosimOS).MachineRestart
 	syscall := syscallabi.GetGoroutineLocalSyscall()
+	syscall.Trampoline = trampolineMachineRestart
 	syscall.OS = gosimOS
-	syscall.Trap = 1010
 	syscall.Int0 = uintptr(machineID)
 	syscall.Int1 = syscallabi.BoolToUintptr(partialDisk)
 	gosimOS.dispatchSyscall(syscall)
@@ -273,12 +196,19 @@ func SyscallMachineRestart(machineID int, partialDisk bool) (err error) {
 }
 
 //go:norace
+func trampolineMachineRestart(syscall *syscallabi.Syscall) {
+	machineID := int(syscall.Int0)
+	partialDisk := syscallabi.BoolFromUintptr(syscall.Int1)
+	err := syscall.OS.(*GosimOS).MachineRestart(machineID, partialDisk)
+	syscall.Errno = syscallabi.ErrErrno(err)
+	syscall.Complete()
+}
+
+//go:norace
 func SyscallMachineSetBootProgram(machineID int, program any) (err error) {
-	// invokes (for go to definition):
-	_ = (*GosimOS).MachineSetBootProgram
 	syscall := syscallabi.GetGoroutineLocalSyscall()
+	syscall.Trampoline = trampolineMachineSetBootProgram
 	syscall.OS = gosimOS
-	syscall.Trap = 1012
 	syscall.Int0 = uintptr(machineID)
 	syscall.Ptr1 = program
 	gosimOS.dispatchSyscall(syscall)
@@ -288,12 +218,19 @@ func SyscallMachineSetBootProgram(machineID int, program any) (err error) {
 }
 
 //go:norace
+func trampolineMachineSetBootProgram(syscall *syscallabi.Syscall) {
+	machineID := int(syscall.Int0)
+	program := syscall.Ptr1.(any)
+	err := syscall.OS.(*GosimOS).MachineSetBootProgram(machineID, program)
+	syscall.Errno = syscallabi.ErrErrno(err)
+	syscall.Complete()
+}
+
+//go:norace
 func SyscallMachineSetSometimesCrashOnSync(machineID int, crash bool) (err error) {
-	// invokes (for go to definition):
-	_ = (*GosimOS).MachineSetSometimesCrashOnSync
 	syscall := syscallabi.GetGoroutineLocalSyscall()
+	syscall.Trampoline = trampolineMachineSetSometimesCrashOnSync
 	syscall.OS = gosimOS
-	syscall.Trap = 1013
 	syscall.Int0 = uintptr(machineID)
 	syscall.Int1 = syscallabi.BoolToUintptr(crash)
 	gosimOS.dispatchSyscall(syscall)
@@ -302,12 +239,19 @@ func SyscallMachineSetSometimesCrashOnSync(machineID int, crash bool) (err error
 }
 
 //go:norace
+func trampolineMachineSetSometimesCrashOnSync(syscall *syscallabi.Syscall) {
+	machineID := int(syscall.Int0)
+	crash := syscallabi.BoolFromUintptr(syscall.Int1)
+	err := syscall.OS.(*GosimOS).MachineSetSometimesCrashOnSync(machineID, crash)
+	syscall.Errno = syscallabi.ErrErrno(err)
+	syscall.Complete()
+}
+
+//go:norace
 func SyscallMachineStop(machineID int, graceful bool) {
-	// invokes (for go to definition):
-	_ = (*GosimOS).MachineStop
 	syscall := syscallabi.GetGoroutineLocalSyscall()
+	syscall.Trampoline = trampolineMachineStop
 	syscall.OS = gosimOS
-	syscall.Trap = 1004
 	syscall.Int0 = uintptr(machineID)
 	syscall.Int1 = syscallabi.BoolToUintptr(graceful)
 	gosimOS.dispatchSyscall(syscall)
@@ -315,24 +259,34 @@ func SyscallMachineStop(machineID int, graceful bool) {
 }
 
 //go:norace
+func trampolineMachineStop(syscall *syscallabi.Syscall) {
+	machineID := int(syscall.Int0)
+	graceful := syscallabi.BoolFromUintptr(syscall.Int1)
+	syscall.OS.(*GosimOS).MachineStop(machineID, graceful)
+	syscall.Complete()
+}
+
+//go:norace
 func SyscallMachineWait(machineID int) {
-	// invokes (for go to definition):
-	_ = (*GosimOS).MachineWait
 	syscall := syscallabi.GetGoroutineLocalSyscall()
+	syscall.Trampoline = trampolineMachineWait
 	syscall.OS = gosimOS
-	syscall.Trap = 1006
 	syscall.Int0 = uintptr(machineID)
 	gosimOS.dispatchSyscall(syscall)
 	return
 }
 
 //go:norace
+func trampolineMachineWait(syscall *syscallabi.Syscall) {
+	machineID := int(syscall.Int0)
+	syscall.OS.(*GosimOS).MachineWait(machineID, syscall)
+}
+
+//go:norace
 func SyscallSetConnected(a string, b string, connected bool) (err error) {
-	// invokes (for go to definition):
-	_ = (*GosimOS).SetConnected
 	syscall := syscallabi.GetGoroutineLocalSyscall()
+	syscall.Trampoline = trampolineSetConnected
 	syscall.OS = gosimOS
-	syscall.Trap = 1001
 	syscall.Ptr0 = a
 	syscall.Ptr1 = b
 	syscall.Int2 = syscallabi.BoolToUintptr(connected)
@@ -344,12 +298,20 @@ func SyscallSetConnected(a string, b string, connected bool) (err error) {
 }
 
 //go:norace
+func trampolineSetConnected(syscall *syscallabi.Syscall) {
+	a := syscall.Ptr0.(string)
+	b := syscall.Ptr1.(string)
+	connected := syscallabi.BoolFromUintptr(syscall.Int2)
+	err := syscall.OS.(*GosimOS).SetConnected(a, b, connected)
+	syscall.Errno = syscallabi.ErrErrno(err)
+	syscall.Complete()
+}
+
+//go:norace
 func SyscallSetDelay(a string, b string, delay time.Duration) (err error) {
-	// invokes (for go to definition):
-	_ = (*GosimOS).SetDelay
 	syscall := syscallabi.GetGoroutineLocalSyscall()
+	syscall.Trampoline = trampolineSetDelay
 	syscall.OS = gosimOS
-	syscall.Trap = 1002
 	syscall.Ptr0 = a
 	syscall.Ptr1 = b
 	syscall.Int2 = uintptr(delay)
@@ -361,14 +323,30 @@ func SyscallSetDelay(a string, b string, delay time.Duration) (err error) {
 }
 
 //go:norace
+func trampolineSetDelay(syscall *syscallabi.Syscall) {
+	a := syscall.Ptr0.(string)
+	b := syscall.Ptr1.(string)
+	delay := time.Duration(syscall.Int2)
+	err := syscall.OS.(*GosimOS).SetDelay(a, b, delay)
+	syscall.Errno = syscallabi.ErrErrno(err)
+	syscall.Complete()
+}
+
+//go:norace
 func SyscallSetSimulationTimeout(timeout time.Duration) (err error) {
-	// invokes (for go to definition):
-	_ = (*GosimOS).SetSimulationTimeout
 	syscall := syscallabi.GetGoroutineLocalSyscall()
+	syscall.Trampoline = trampolineSetSimulationTimeout
 	syscall.OS = gosimOS
-	syscall.Trap = 1000
 	syscall.Int0 = uintptr(timeout)
 	gosimOS.dispatchSyscall(syscall)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	return
+}
+
+//go:norace
+func trampolineSetSimulationTimeout(syscall *syscallabi.Syscall) {
+	timeout := time.Duration(syscall.Int0)
+	err := syscall.OS.(*GosimOS).SetSimulationTimeout(timeout)
+	syscall.Errno = syscallabi.ErrErrno(err)
+	syscall.Complete()
 }

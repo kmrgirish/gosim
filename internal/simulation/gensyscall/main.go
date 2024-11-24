@@ -98,7 +98,7 @@ func (o *outputSorter) append(key, value string) {
 }
 
 func (o *outputSorter) output() string {
-	slices.SortFunc(o.outputs, func(a, b outputWithSortKey) int {
+	slices.SortStableFunc(o.outputs, func(a, b outputWithSortKey) int {
 		return cmp.Compare(a.sortKey, b.sortKey)
 	})
 	var out strings.Builder
@@ -477,7 +477,6 @@ func writeSyscalls(outputPath string, syscalls []syscallInfo, isMachine bool) {
 	}
 
 	callers := newOutputSorter()
-	dispatches := newOutputSorter()
 	checks := newOutputSorter()
 	ifaces := newOutputSorter()
 	for _, info := range syscalls {
@@ -569,14 +568,6 @@ func writeSyscalls(outputPath string, syscalls []syscallInfo, isMachine bool) {
 			parseDispatchText += "\t\tsyscall.Complete()\n"
 		}
 
-		dispatchText := fmt.Sprintf("\tcase %s:\n", sysVal) +
-			"\t\t// called by (for find references):\n" +
-			fmt.Sprintf("\t\t_ = %s\n", "Syscall"+ifaceName) +
-			prepareDispatch +
-			fmt.Sprintf("\t\t%sos.%s(%s)\n", dispatchRet, ifaceName, strings.Join(dispatchArgs, ", ")) +
-			parseDispatchText
-		dispatches.append(sysName, dispatchText)
-
 		if info.sysVal == 0 {
 			checkText := fmt.Sprintf("\tcase %s:\n", sysVal) +
 				"\t\treturn true\n"
@@ -588,11 +579,9 @@ func writeSyscalls(outputPath string, syscalls []syscallInfo, isMachine bool) {
 
 		callerText := "//go:norace\n" +
 			fmt.Sprintf("func %s(%s)%s {\n", "Syscall"+ifaceName, strings.Join(callerArgs, ", "), callerRet) +
-			"\t// invokes (for go to definition):\n" +
-			fmt.Sprintf("\t_ = (*%s).%s\n", osTypeName, ifaceName) +
 			"\tsyscall := syscallabi.GetGoroutineLocalSyscall()\n" +
+			fmt.Sprintf("\tsyscall.Trampoline = trampoline%s\n", ifaceName) +
 			fmt.Sprintf("\tsyscall.OS = %s\n", osImplName) +
-			fmt.Sprintf("\tsyscall.Trap = %s\n", sysVal) +
 			prepareCaller +
 			fmt.Sprintf("\t%s.dispatchSyscall(syscall)\n", osImplName) +
 			parseCallerText +
@@ -600,6 +589,14 @@ func writeSyscalls(outputPath string, syscalls []syscallInfo, isMachine bool) {
 			"\treturn\n" +
 			"}\n\n"
 		callers.append(sysName, callerText)
+
+		dispatchText := "//go:norace\n" +
+			fmt.Sprintf("func trampoline%s(syscall *syscallabi.Syscall) {\n", ifaceName) +
+			prepareDispatch +
+			fmt.Sprintf("\t\t%ssyscall.OS.(*%s).%s(%s)\n", dispatchRet, osTypeName, ifaceName, strings.Join(dispatchArgs, ", ")) +
+			parseDispatchText +
+			"}\n\n"
+		callers.append(sysName, dispatchText)
 	}
 
 	output := ""
@@ -647,15 +644,7 @@ func (os *%s) dispatchSyscall(s *syscallabi.Syscall) {
 	os.dispatcher.Dispatch(s)
 }
 
-//go:norace
-func (os *%s) HandleSyscall(syscall *syscallabi.Syscall) {
-	switch (syscall.Trap) {
-`, osIfaceName, osTypeName, osTypeName, osTypeName) + dispatches.output() + `	default:
-		panic("bad")
-	}
-}
-
-` + callers.output()
+`, osIfaceName, osTypeName, osTypeName) + callers.output()
 
 	if !isMachine {
 		output += `
