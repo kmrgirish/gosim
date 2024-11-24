@@ -1257,6 +1257,17 @@ func (l *LinuxOS) SysFlock(fd int, how int) (err error) {
 	return nil
 }
 
+func (l *LinuxOS) SysFcntlFlock(fd uintptr, cmd int, lk syscallabi.ValueView[Flock_t]) (err error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.shutdown {
+		return syscall.EINVAL
+	}
+
+	// TODO: reconsider
+	return nil
+}
+
 func (l *LinuxOS) SysConnect(fd int, addrPtr unsafe.Pointer, addrLen Socklen) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
