@@ -80,18 +80,25 @@ func (t *packageTranslator) maybeConvertChanType(x dst.Expr, typ ChanType) dst.E
 	}
 }
 
-func (t *packageTranslator) maybeExtractNamedChanType(x dst.Expr, typ ChanType) dst.Expr {
-	if typ.Named == typ.Type {
-		return x
+// chanForRewrite checks if dst.Expr has a chan type and prepares it for
+// rewriting
+func (t *packageTranslator) chanForRewrite(x dst.Expr) (dst.Expr, bool) {
+	typ, ok := t.isChanType(x)
+	if !ok {
+		return nil, false
 	}
-	return &dst.CallExpr{Fun: t.newRuntimeSelector("ExtractChan"), Args: []dst.Expr{x}}
+	x = t.apply(x).(dst.Expr)
+	if typ.Named != typ.Type {
+		x = &dst.CallExpr{Fun: t.newRuntimeSelector("ExtractChan"), Args: []dst.Expr{x}}
+	}
+	return x, true
 }
 
 func (t *packageTranslator) rewriteChanLen(c *dstutil.Cursor) {
 	if call, ok := c.Node().(*dst.CallExpr); ok && t.isNamedBuiltIn(call.Fun, "len") {
-		if typ, ok := t.isChanType(call.Args[0]); ok {
+		if ch, ok := t.chanForRewrite(call.Args[0]); ok {
 			call.Fun = &dst.SelectorExpr{
-				X:   t.maybeExtractNamedChanType(call.Args[0], typ),
+				X:   ch,
 				Sel: dst.NewIdent("Len"),
 			}
 			call.Args = nil
@@ -101,9 +108,9 @@ func (t *packageTranslator) rewriteChanLen(c *dstutil.Cursor) {
 
 func (t *packageTranslator) rewriteChanCap(c *dstutil.Cursor) {
 	if call, ok := c.Node().(*dst.CallExpr); ok && t.isNamedBuiltIn(call.Fun, "cap") {
-		if typ, ok := t.isChanType(call.Args[0]); ok {
+		if ch, ok := t.chanForRewrite(call.Args[0]); ok {
 			call.Fun = &dst.SelectorExpr{
-				X:   t.maybeExtractNamedChanType(call.Args[0], typ),
+				X:   ch,
 				Sel: dst.NewIdent("Cap"),
 			}
 			call.Args = nil
@@ -126,10 +133,10 @@ func (t *packageTranslator) rewriteChanType(c *dstutil.Cursor) {
 
 func (t *packageTranslator) rewriteChanRange(c *dstutil.Cursor) {
 	if rangeStmt, ok := c.Node().(*dst.RangeStmt); ok {
-		if typ, ok := t.isChanType(rangeStmt.X); ok {
+		if ch, ok := t.chanForRewrite(rangeStmt.X); ok {
 			rangeStmt.X = &dst.CallExpr{
 				Fun: &dst.SelectorExpr{
-					X:   t.maybeExtractNamedChanType(t.apply(rangeStmt.X).(dst.Expr), typ),
+					X:   ch,
 					Sel: dst.NewIdent("Range"),
 				},
 			}
@@ -142,11 +149,11 @@ func (t *packageTranslator) rewriteChanRecvSimpleExpr(c *dstutil.Cursor) {
 	// <-ch
 	if recvExpr, ok := isRecvExpr(c.Node()); ok {
 		// we catch (val, ok) cases earlier
-		typ, _ := t.isChanType(recvExpr.X)
+		ch, _ := t.chanForRewrite(recvExpr.X)
 
 		c.Replace(&dst.CallExpr{
 			Fun: &dst.SelectorExpr{
-				X:   t.maybeExtractNamedChanType(t.apply(recvExpr.X).(dst.Expr), typ),
+				X:   ch,
 				Sel: dst.NewIdent("Recv"),
 			},
 		})
@@ -162,10 +169,10 @@ func (t *packageTranslator) rewriteChanRecvOk(c *dstutil.Cursor) {
 	}
 
 	if recvExpr, ok := isRecvExpr(*rhs); ok {
-		typ, _ := t.isChanType(recvExpr.X)
+		ch, _ := t.chanForRewrite(recvExpr.X)
 		*rhs = &dst.CallExpr{
 			Fun: &dst.SelectorExpr{
-				X:   t.maybeExtractNamedChanType(t.apply(recvExpr.X).(dst.Expr), typ),
+				X:   ch,
 				Sel: dst.NewIdent("RecvOk"),
 			},
 		}
@@ -175,11 +182,11 @@ func (t *packageTranslator) rewriteChanRecvOk(c *dstutil.Cursor) {
 func (t *packageTranslator) rewriteChanClose(c *dstutil.Cursor) {
 	// close ch
 	if callExpr, ok := c.Node().(*dst.CallExpr); ok && t.isNamedBuiltIn(callExpr.Fun, "close") {
-		typ, _ := t.isChanType(callExpr.Args[0])
+		ch, _ := t.chanForRewrite(callExpr.Args[0])
 		r := &dst.CallExpr{
 			Decs: callExpr.Decs,
 			Fun: &dst.SelectorExpr{
-				X:   t.maybeExtractNamedChanType(t.apply(callExpr.Args[0]).(dst.Expr), typ),
+				X:   ch,
 				Sel: dst.NewIdent("Close"),
 			},
 		}
@@ -191,11 +198,11 @@ func (t *packageTranslator) rewriteChanSend(c *dstutil.Cursor) {
 	// write to chan
 	// ch <-
 	if sendStmt, ok := c.Node().(*dst.SendStmt); ok {
-		typ, _ := t.isChanType(sendStmt.Chan)
+		ch, _ := t.chanForRewrite(sendStmt.Chan)
 		c.Replace(&dst.ExprStmt{
 			X: &dst.CallExpr{
 				Fun: &dst.SelectorExpr{
-					X:   t.maybeExtractNamedChanType(t.apply(sendStmt.Chan).(dst.Expr), typ),
+					X:   ch,
 					Sel: dst.NewIdent("Send"),
 				},
 				Args: []dst.Expr{
@@ -285,9 +292,9 @@ func (t *packageTranslator) rewriteSelectStmt(c *dstutil.Cursor) {
 			var handler dst.Expr
 
 			if sendStmt, ok := clause.Comm.(*dst.SendStmt); ok {
-				typ, _ := t.isChanType(sendStmt.Chan)
+				ch, _ := t.chanForRewrite(sendStmt.Chan)
 				handler = &dst.CallExpr{
-					Fun:  &dst.SelectorExpr{X: t.maybeExtractNamedChanType(sendStmt.Chan, typ), Sel: dst.NewIdent("SendSelector")},
+					Fun:  &dst.SelectorExpr{X: ch, Sel: dst.NewIdent("SendSelector")},
 					Args: []dst.Expr{sendStmt.Value},
 				}
 			} else if exprStmt, ok := clause.Comm.(*dst.ExprStmt); ok {
@@ -295,10 +302,9 @@ func (t *packageTranslator) rewriteSelectStmt(c *dstutil.Cursor) {
 				if !ok {
 					log.Fatal("bad recv expr")
 				}
-				typ, _ := t.isChanType(recvExpr.X)
-
+				ch, _ := t.chanForRewrite(recvExpr.X)
 				handler = &dst.CallExpr{
-					Fun: &dst.SelectorExpr{X: t.maybeExtractNamedChanType(recvExpr.X, typ), Sel: dst.NewIdent("RecvSelector")},
+					Fun: &dst.SelectorExpr{X: ch, Sel: dst.NewIdent("RecvSelector")},
 				}
 			} else if assignStmt, ok := clause.Comm.(*dst.AssignStmt); ok {
 				if len(assignStmt.Rhs) != 1 {
@@ -340,8 +346,9 @@ func (t *packageTranslator) rewriteSelectStmt(c *dstutil.Cursor) {
 					},
 				}, clause.Body...)
 
+				ch, _ := t.chanForRewrite(recvExpr.X)
 				handler = &dst.CallExpr{
-					Fun: &dst.SelectorExpr{X: t.maybeExtractNamedChanType(recvExpr.X, typ), Sel: dst.NewIdent("RecvSelector")},
+					Fun: &dst.SelectorExpr{X: ch, Sel: dst.NewIdent("RecvSelector")},
 				}
 			} else if clause.Comm == nil {
 				hasDefault = true

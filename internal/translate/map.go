@@ -53,27 +53,6 @@ func (t *packageTranslator) isMapType(expr dst.Expr) (MapType, bool) {
 	return MapType{}, false
 }
 
-func (t *packageTranslator) isMapIndex(node dst.Node) (*dst.IndexExpr, MapType, bool) {
-	expr, ok := node.(dst.Expr)
-	if !ok {
-		return nil, MapType{}, false
-	}
-	expr = dstutil.Unparen(expr)
-	if indexExpr, ok := expr.(*dst.IndexExpr); ok {
-		if mapType, ok := t.isMapType(indexExpr.X); ok {
-			return indexExpr, mapType, true
-		}
-	}
-	return nil, MapType{}, false
-}
-
-func (t *packageTranslator) maybeExtractNamedMapType(x dst.Expr, typ MapType) dst.Expr {
-	if typ.Type == typ.Named {
-		return x
-	}
-	return &dst.CallExpr{Fun: t.newRuntimeSelector("ExtractMap"), Args: []dst.Expr{x}}
-}
-
 func (t *packageTranslator) maybeConvertMapType(x dst.Expr, typ MapType) dst.Expr {
 	if typ.Named == typ.Type {
 		return x
@@ -87,13 +66,46 @@ func (t *packageTranslator) maybeConvertMapType(x dst.Expr, typ MapType) dst.Exp
 	}
 }
 
+// mapForRewrite checks if dst.Expr has a map type and prepares it for
+// rewriting
+func (t *packageTranslator) mapForRewrite(x dst.Expr) (dst.Expr, bool) {
+	typ, ok := t.isMapType(x)
+	if !ok {
+		return nil, false
+	}
+	x = t.apply(x).(dst.Expr)
+	if typ.Named != typ.Type {
+		x = &dst.CallExpr{Fun: t.newRuntimeSelector("ExtractMap"), Args: []dst.Expr{x}}
+	}
+	return x, true
+}
+
+// mapForRewrite checks if dst.Expr is dst.IndexExpr into a map type and
+// prepares it for rewriting
+func (t *packageTranslator) mapIndexForRewrite(node dst.Node) (dst.Expr, dst.Expr, bool) {
+	expr, ok := node.(dst.Expr)
+	if !ok {
+		return nil, nil, false
+	}
+	expr = dstutil.Unparen(expr)
+	if indexExpr, ok := expr.(*dst.IndexExpr); ok {
+		mp, ok := t.mapForRewrite(indexExpr.X)
+		if !ok {
+			return nil, nil, false
+		}
+
+		return mp, t.apply(indexExpr.Index).(dst.Expr), true
+	}
+	return nil, nil, false
+}
+
 func (t *packageTranslator) rewriteMapRange(c *dstutil.Cursor) {
 	// map range
 	if rangeStmt, ok := c.Node().(*dst.RangeStmt); ok {
-		if typ, ok := t.isMapType(rangeStmt.X); ok {
+		if x, ok := t.mapForRewrite(rangeStmt.X); ok {
 			rangeStmt.X = &dst.CallExpr{
 				Fun: &dst.SelectorExpr{
-					X:   t.maybeExtractNamedMapType(rangeStmt.X, typ),
+					X:   x,
 					Sel: dst.NewIdent("Range"),
 				},
 			}
@@ -104,10 +116,10 @@ func (t *packageTranslator) rewriteMapRange(c *dstutil.Cursor) {
 func (t *packageTranslator) rewriteMapDelete(c *dstutil.Cursor) {
 	// delete from map
 	if callExpr, ok := c.Node().(*dst.CallExpr); ok && t.isNamedBuiltIn(callExpr.Fun, "delete") {
-		if typ, ok := t.isMapType(callExpr.Args[0]); ok {
+		if x, ok := t.mapForRewrite(callExpr.Args[0]); ok {
 			c.Replace(&dst.CallExpr{
 				Fun: &dst.SelectorExpr{
-					X:   t.maybeExtractNamedMapType(t.apply(callExpr.Args[0]).(dst.Expr), typ),
+					X:   x,
 					Sel: dst.NewIdent("Delete"),
 				},
 				Args: []dst.Expr{
@@ -121,10 +133,10 @@ func (t *packageTranslator) rewriteMapDelete(c *dstutil.Cursor) {
 func (t *packageTranslator) rewriteMapClear(c *dstutil.Cursor) {
 	// delete from map
 	if callExpr, ok := c.Node().(*dst.CallExpr); ok && t.isNamedBuiltIn(callExpr.Fun, "clear") {
-		if typ, ok := t.isMapType(callExpr.Args[0]); ok {
+		if x, ok := t.mapForRewrite(callExpr.Args[0]); ok {
 			c.Replace(&dst.CallExpr{
 				Fun: &dst.SelectorExpr{
-					X:   t.maybeExtractNamedMapType(t.apply(callExpr.Args[0]).(dst.Expr), typ),
+					X:   x,
 					Sel: dst.NewIdent("Clear"),
 				},
 			})
@@ -246,10 +258,9 @@ func (t *packageTranslator) rewriteMapLiteral(c *dstutil.Cursor) {
 
 func (t *packageTranslator) rewriteMapLen(c *dstutil.Cursor) {
 	if lenExpr, ok := c.Node().(*dst.CallExpr); ok && t.isNamedBuiltIn(lenExpr.Fun, "len") {
-		if typ, ok := t.isMapType(lenExpr.Args[0]); ok {
-			// XXX: len, cap chan?
+		if x, ok := t.mapForRewrite(lenExpr.Args[0]); ok {
 			lenExpr.Fun = &dst.SelectorExpr{
-				X:   t.maybeExtractNamedMapType(lenExpr.Args[0], typ),
+				X:   x,
 				Sel: dst.NewIdent("Len"),
 			}
 			lenExpr.Args = nil
@@ -284,15 +295,15 @@ func (t *packageTranslator) rewriteMapType(c *dstutil.Cursor) {
 }
 
 func (t *packageTranslator) rewriteMapIndex(c *dstutil.Cursor) {
-	if indexExpr, wrapped, ok := t.isMapIndex(c.Node()); ok {
+	if x, index, ok := t.mapIndexForRewrite(c.Node()); ok {
 		// we catch (val, ok) cases earlier
 		c.Replace(&dst.CallExpr{
 			Fun: &dst.SelectorExpr{
-				X:   t.maybeExtractNamedMapType(t.apply(indexExpr.X).(dst.Expr), wrapped),
+				X:   x,
 				Sel: dst.NewIdent("Get"),
 			},
 			Args: []dst.Expr{
-				t.apply(indexExpr.Index).(dst.Expr),
+				index,
 			},
 		})
 	}
@@ -306,14 +317,14 @@ func (t *packageTranslator) rewriteMapGetOk(c *dstutil.Cursor) {
 		return
 	}
 
-	if index, wrapped, ok := t.isMapIndex(*rhs); ok {
+	if x, index, ok := t.mapIndexForRewrite(*rhs); ok {
 		*rhs = &dst.CallExpr{
 			Fun: &dst.SelectorExpr{
-				X:   t.maybeExtractNamedMapType(index.X, wrapped),
+				X:   x,
 				Sel: dst.NewIdent("GetOk"),
 			},
 			Args: []dst.Expr{
-				index.Index,
+				index,
 			},
 		}
 	}
@@ -345,135 +356,66 @@ type mapModifyInfo struct {
 type mapAssignInfo struct {
 	mapModify func(op token.Token, val dst.Expr) mapModifyInfo
 	mapSet    func(val dst.Expr) dst.Expr
-	mapType   MapType
 }
 
 func (t *packageTranslator) isMapAssign(lhs dst.Expr) (mapAssignInfo, bool) {
-	if index, wrapped, ok := t.isMapIndex(lhs); ok {
-		return mapAssignInfo{
-			mapModify: func(op token.Token, val dst.Expr) mapModifyInfo {
-				suffix := t.suffix()
-				keyName := "key" + suffix
-				mapName := "map" + suffix
-				return mapModifyInfo{
-					copyVarsStmt: &dst.AssignStmt{
-						Lhs: []dst.Expr{dst.NewIdent(mapName), dst.NewIdent(keyName)},
-						Tok: token.DEFINE,
-						Rhs: []dst.Expr{t.apply(index.X).(dst.Expr), t.apply(index.Index).(dst.Expr)},
-					},
-					writeExpr: &dst.CallExpr{
-						Fun: &dst.SelectorExpr{
-							X:   dst.NewIdent(mapName),
-							Sel: dst.NewIdent("Set"),
-						},
-						Args: []dst.Expr{
-							dst.NewIdent(keyName),
-							&dst.BinaryExpr{
-								X: &dst.CallExpr{
-									Fun: &dst.SelectorExpr{
-										X:   dst.NewIdent(mapName),
-										Sel: dst.NewIdent("Get"),
-									},
-									Args: []dst.Expr{
-										dst.NewIdent(keyName),
-									},
-								},
-								Op: op,
-								Y:  t.apply(val).(dst.Expr),
-							},
-						},
-					},
-				}
-			},
-			mapSet: func(val dst.Expr) dst.Expr {
-				return &dst.CallExpr{
+	x, index, ok := t.mapIndexForRewrite(lhs)
+	if !ok {
+		return mapAssignInfo{}, false
+	}
+
+	return mapAssignInfo{
+		mapModify: func(op token.Token, val dst.Expr) mapModifyInfo {
+			suffix := t.suffix()
+			keyName := "key" + suffix
+			mapName := "map" + suffix
+			return mapModifyInfo{
+				copyVarsStmt: &dst.AssignStmt{
+					Lhs: []dst.Expr{dst.NewIdent(mapName), dst.NewIdent(keyName)},
+					Tok: token.DEFINE,
+					Rhs: []dst.Expr{x, index},
+				},
+				writeExpr: &dst.CallExpr{
 					Fun: &dst.SelectorExpr{
-						X:   t.maybeExtractNamedMapType(t.apply(index.X).(dst.Expr), wrapped),
+						X:   dst.NewIdent(mapName),
 						Sel: dst.NewIdent("Set"),
 					},
 					Args: []dst.Expr{
-						t.apply(index.Index).(dst.Expr),
-						t.apply(val).(dst.Expr),
+						dst.NewIdent(keyName),
+						&dst.BinaryExpr{
+							X: &dst.CallExpr{
+								Fun: &dst.SelectorExpr{
+									X:   dst.NewIdent(mapName),
+									Sel: dst.NewIdent("Get"),
+								},
+								Args: []dst.Expr{
+									dst.NewIdent(keyName),
+								},
+							},
+							Op: op,
+							Y:  t.apply(val).(dst.Expr),
+						},
 					},
-				}
-			},
-			mapType: wrapped,
-		}, true
-	}
-	return mapAssignInfo{}, false
+				},
+			}
+		},
+		mapSet: func(val dst.Expr) dst.Expr {
+			return &dst.CallExpr{
+				Fun: &dst.SelectorExpr{
+					X:   x,
+					Sel: dst.NewIdent("Set"),
+				},
+				Args: []dst.Expr{
+					index,
+					t.apply(val).(dst.Expr),
+				},
+			}
+		},
+	}, true
 }
 
 func (t *packageTranslator) rewriteMapAssign(c *dstutil.Cursor) {
-	// map assignment
-	// "m[x] ="
-	if assignStmt, ok := c.Node().(*dst.AssignStmt); ok {
-		hasAnySpecial := false
-		for _, lhs := range assignStmt.Lhs {
-			if _, ok := t.isMapAssign(lhs); ok {
-				hasAnySpecial = true
-			}
-		}
-		if !hasAnySpecial {
-			return
-		}
-
-		if op, ok := isOpAssign(assignStmt.Tok); ok {
-			if len(assignStmt.Lhs) != 1 || len(assignStmt.Rhs) != 1 {
-				panic("special assign with multiple lhs or rhs?")
-			}
-
-			info, _ := t.isMapAssign(assignStmt.Lhs[0])
-			info2 := info.mapModify(op, assignStmt.Rhs[0])
-			c.InsertBefore(info2.copyVarsStmt)
-			c.Replace(&dst.ExprStmt{
-				Decs: dst.ExprStmtDecorations{
-					NodeDecs: assignStmt.Decs.NodeDecs,
-				},
-				X: info2.writeExpr,
-			})
-		} else {
-			if len(assignStmt.Lhs) == 1 {
-				info, _ := t.isMapAssign(assignStmt.Lhs[0])
-				c.Replace(&dst.ExprStmt{
-					Decs: dst.ExprStmtDecorations{
-						NodeDecs: assignStmt.Decs.NodeDecs,
-					},
-					X: info.mapSet(assignStmt.Rhs[0]),
-				})
-			} else {
-				if assignStmt.Tok != token.ASSIGN {
-					panic("non-name on left side of := ?")
-				}
-
-				for i, lhs := range assignStmt.Lhs {
-					if info, ok := t.isMapAssign(lhs); ok {
-						tmp := "val" + t.suffix()
-						c.InsertBefore(&dst.DeclStmt{
-							Decl: &dst.GenDecl{
-								Tok: token.VAR,
-								Specs: []dst.Spec{
-									&dst.ValueSpec{
-										Names: []*dst.Ident{
-											dst.NewIdent(tmp),
-										},
-										Type: t.makeTypeExpr(info.mapType.Type.Elem()),
-									},
-								},
-							},
-						})
-						assignStmt.Lhs[i] = dst.NewIdent(tmp)
-						c.InsertAfter(&dst.ExprStmt{
-							Decs: dst.ExprStmtDecorations{
-								NodeDecs: assignStmt.Decs.NodeDecs,
-							},
-							X: info.mapSet(dst.NewIdent(tmp)),
-						})
-					}
-				}
-			}
-		}
-	}
-
+	// "m[x]++""
 	if incDecStmt, ok := c.Node().(*dst.IncDecStmt); ok {
 		info, ok := t.isMapAssign(incDecStmt.X)
 		if !ok {
@@ -493,5 +435,90 @@ func (t *packageTranslator) rewriteMapAssign(c *dstutil.Cursor) {
 			},
 			X: info2.writeExpr,
 		})
+	}
+
+	// "m[x] =" or "m[x] +="
+	assignStmt, ok := c.Node().(*dst.AssignStmt)
+	if !ok {
+		return
+	}
+
+	hasAnyMaps := false
+	for _, lhs := range assignStmt.Lhs {
+		if _, ok := t.isMapAssign(lhs); ok {
+			hasAnyMaps = true
+		}
+	}
+	if !hasAnyMaps {
+		return
+	}
+
+	if op, ok := isOpAssign(assignStmt.Tok); ok {
+		// m[x] +=
+
+		if len(assignStmt.Lhs) != 1 || len(assignStmt.Rhs) != 1 {
+			panic("special assign with multiple lhs or rhs?")
+		}
+
+		info, _ := t.isMapAssign(assignStmt.Lhs[0])
+		info2 := info.mapModify(op, assignStmt.Rhs[0])
+		c.InsertBefore(info2.copyVarsStmt)
+		c.Replace(&dst.ExprStmt{
+			Decs: dst.ExprStmtDecorations{
+				NodeDecs: assignStmt.Decs.NodeDecs,
+			},
+			X: info2.writeExpr,
+		})
+
+	} else if len(assignStmt.Lhs) == 1 {
+		// m[x] =
+		info, _ := t.isMapAssign(assignStmt.Lhs[0])
+		c.Replace(&dst.ExprStmt{
+			Decs: dst.ExprStmtDecorations{
+				NodeDecs: assignStmt.Decs.NodeDecs,
+			},
+			X: info.mapSet(assignStmt.Rhs[0]),
+		})
+
+	} else {
+		// m[x], m[y], a, b =
+		if assignStmt.Tok != token.ASSIGN {
+			panic("non-name on left side of := ?")
+		}
+
+		for i, lhs := range assignStmt.Lhs {
+			info, ok := t.isMapAssign(lhs)
+			if !ok {
+				continue
+			}
+
+			// get the type of the map again,
+			// now for a temp var
+			index := lhs.(*dst.IndexExpr)
+			mapType, _ := t.isMapType(index.X)
+			elemType := mapType.Type.Elem()
+
+			tmp := "val" + t.suffix()
+			c.InsertBefore(&dst.DeclStmt{
+				Decl: &dst.GenDecl{
+					Tok: token.VAR,
+					Specs: []dst.Spec{
+						&dst.ValueSpec{
+							Names: []*dst.Ident{
+								dst.NewIdent(tmp),
+							},
+							Type: t.makeTypeExpr(elemType),
+						},
+					},
+				},
+			})
+			assignStmt.Lhs[i] = dst.NewIdent(tmp)
+			c.InsertAfter(&dst.ExprStmt{
+				Decs: dst.ExprStmtDecorations{
+					NodeDecs: assignStmt.Decs.NodeDecs,
+				},
+				X: info.mapSet(dst.NewIdent(tmp)),
+			})
+		}
 	}
 }
