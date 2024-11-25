@@ -507,7 +507,7 @@ func (l *LinuxOS) SysFallocate(fd int, mode uint32, off int64, len int64) (err e
 		return syscall.EINVAL
 	}
 
-	stat, err := l.simulation.main.filesystem.Statfd(f.inode)
+	stat, err := l.machine.filesystem.Statfd(f.inode)
 	if err != nil {
 		// huh
 		return err
@@ -544,7 +544,7 @@ func (l *LinuxOS) SysLseek(fd int, offset int64, whence int) (off int64, err err
 	case io.SeekCurrent:
 		newPos = f.pos + offset
 	case io.SeekEnd:
-		stat, err := l.simulation.main.filesystem.Statfd(f.inode)
+		stat, err := l.machine.filesystem.Statfd(f.inode)
 		if err != nil {
 			// huh
 			return 0, err
