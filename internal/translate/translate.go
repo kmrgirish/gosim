@@ -533,25 +533,36 @@ func (t *packageTranslator) preApply(c *dstutil.Cursor) bool {
 
 	// TODO: think about and make this ordering less brittle
 
-	t.rewriteMapGetOk(c)
-	t.rewriteChanRecvOk(c)
+	// converisons, nil
+	t.rewriteMapImplicitConversion(c)
+	t.rewriteMapNil(c)
 	t.rewriteMapLiteral(c)
-	t.rewriteChanLiteral(c)
-	t.rewriteMapLen(c)
-	t.rewriteMapAssign(c)
-	t.rewriteMapIndex(c)
-	t.rewriteMapDelete(c)
-	t.rewriteMapClear(c)
+	t.rewriteChanImplicitConversion(c)
+	t.rewriteChanNil(c)
+
+	// make
 	t.rewriteMakeMap(c)
 	t.rewriteMakeChan(c)
+
+	// type
 	t.rewriteMapType(c)
-	t.rewriteChanLen(c)
-	t.rewriteChanCap(c)
 	t.rewriteChanType(c)
-	t.rewriteChanRecvSimpleExpr(c)
-	t.rewriteChanRange(c)
+
+	// ops
+	t.rewriteMapAssign(c)
+	t.rewriteMapClear(c)
+	t.rewriteMapDelete(c)
+	t.rewriteMapGetOk(c)
+	t.rewriteMapIndex(c)
+	t.rewriteMapLen(c)
+	t.rewriteChanCap(c)
 	t.rewriteChanClose(c)
+	t.rewriteChanLen(c)
+	t.rewriteChanRange(c)
+	t.rewriteChanRecvOk(c)
+	t.rewriteChanRecvSimpleExpr(c)
 	t.rewriteChanSend(c)
+
 	t.rewriteGlobalDef(c)
 	t.rewriteInit(c)
 	t.markSyncFuncsNorace(c)

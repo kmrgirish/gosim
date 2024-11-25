@@ -213,7 +213,7 @@ func (t *packageTranslator) rewriteChanSend(c *dstutil.Cursor) {
 	}
 }
 
-func (t *packageTranslator) rewriteChanLiteral(c *dstutil.Cursor) {
+func (t *packageTranslator) rewriteChanNil(c *dstutil.Cursor) {
 	if ident, ok := c.Node().(*dst.Ident); ok && ident.Name == "nil" {
 		if chanType, ok := t.isChanType(ident); ok {
 			c.Replace(t.maybeConvertChanType(&dst.CallExpr{
@@ -225,7 +225,11 @@ func (t *packageTranslator) rewriteChanLiteral(c *dstutil.Cursor) {
 				},
 			}, chanType))
 		}
-	} else if expr, ok := c.Node().(dst.Expr); ok {
+	}
+}
+
+func (t *packageTranslator) rewriteChanImplicitConversion(c *dstutil.Cursor) {
+	if expr, ok := c.Node().(dst.Expr); ok {
 		astExpr, _ := t.astMap.Nodes[expr].(ast.Expr)
 		if typ, ok := t.implicitConversions[astExpr]; ok {
 			if _, ok := isTypChanType(typ); ok {
@@ -264,184 +268,186 @@ func (t *packageTranslator) rewriteMakeChan(c *dstutil.Cursor) {
 
 func (t *packageTranslator) rewriteSelectStmt(c *dstutil.Cursor) {
 	// select stmt
-	if selectStmt, ok := c.Node().(*dst.SelectStmt); ok {
-		handlers := []dst.Expr{}
-		var clauses []dst.Stmt
-
-		copyStmt := &dst.AssignStmt{
-			Lhs: []dst.Expr{},
-			Tok: token.DEFINE,
-			Rhs: []dst.Expr{},
-		}
-
-		suffix := t.suffix()
-		selectIdx := "idx" + suffix
-		selectVal := "val" + suffix
-		valUsed := false
-		selectOk := "ok" + suffix
-		okUsed := false
-
-		hasDefault := false
-
-		counter := 0
-
-		for _, clause := range selectStmt.Body.List {
-			clause := clause.(*dst.CommClause)
-
-			isDefault := false
-			var handler dst.Expr
-
-			if sendStmt, ok := clause.Comm.(*dst.SendStmt); ok {
-				ch, _ := t.chanForRewrite(sendStmt.Chan)
-				handler = &dst.CallExpr{
-					Fun:  &dst.SelectorExpr{X: ch, Sel: dst.NewIdent("SendSelector")},
-					Args: []dst.Expr{sendStmt.Value},
-				}
-			} else if exprStmt, ok := clause.Comm.(*dst.ExprStmt); ok {
-				recvExpr, ok := isRecvExpr(exprStmt.X)
-				if !ok {
-					log.Fatal("bad recv expr")
-				}
-				ch, _ := t.chanForRewrite(recvExpr.X)
-				handler = &dst.CallExpr{
-					Fun: &dst.SelectorExpr{X: ch, Sel: dst.NewIdent("RecvSelector")},
-				}
-			} else if assignStmt, ok := clause.Comm.(*dst.AssignStmt); ok {
-				if len(assignStmt.Rhs) != 1 {
-					log.Fatal("bad recv assign stmt")
-				}
-				recvExpr, ok := isRecvExpr(assignStmt.Rhs[0])
-				if !ok {
-					log.Fatal("bad recv expr")
-				}
-
-				typ, _ := t.isChanType(recvExpr.X)
-
-				lhs := assignStmt.Lhs
-				rhs := []dst.Expr{
-					&dst.CallExpr{
-						Fun: &dst.IndexExpr{
-							X:     t.newRuntimeSelector("ChanCast"),
-							Index: t.makeTypeExpr(typ.Type.Elem()),
-						},
-						Args: []dst.Expr{dst.NewIdent(selectVal)},
-					},
-				}
-				valUsed = true
-				if len(lhs) > 1 {
-					rhs = append(rhs, dst.NewIdent(selectOk))
-					okUsed = true
-				}
-
-				clause.Body = append([]dst.Stmt{
-					&dst.AssignStmt{
-						Lhs: lhs,
-						Tok: assignStmt.Tok,
-						Rhs: rhs,
-						Decs: dst.AssignStmtDecorations{
-							NodeDecs: dst.NodeDecs{
-								End: clause.Decs.Comm,
-							},
-						},
-					},
-				}, clause.Body...)
-
-				ch, _ := t.chanForRewrite(recvExpr.X)
-				handler = &dst.CallExpr{
-					Fun: &dst.SelectorExpr{X: ch, Sel: dst.NewIdent("RecvSelector")},
-				}
-			} else if clause.Comm == nil {
-				hasDefault = true
-				isDefault = true
-			} else {
-				panic("help")
-			}
-
-			var caseList []dst.Expr
-			if !isDefault {
-				caseList = []dst.Expr{&dst.BasicLit{Kind: token.INT, Value: fmt.Sprint(counter)}}
-				counter++
-				handlers = append(handlers, handler)
-			}
-			clauses = append(clauses, &dst.CaseClause{
-				List: caseList,
-				Body: clause.Body,
-				Decs: dst.CaseClauseDecorations{
-					NodeDecs: clause.Decs.NodeDecs,
-					Case:     clause.Decs.Case,
-					Colon:    clause.Decs.Colon,
-				},
-			})
-		}
-
-		if !hasDefault {
-			// output a default case to help the compiler understand we will never pass over this select
-			clauses = append(clauses, &dst.CaseClause{
-				// stick this case at the original closing bracket to help comments find their way
-				List: nil, // default
-				Body: []dst.Stmt{
-					&dst.ExprStmt{
-						X: &dst.CallExpr{
-							Fun: dst.NewIdent("panic"),
-							Args: []dst.Expr{
-								&dst.BasicLit{
-									Kind:  token.STRING,
-									Value: strconv.Quote("unreachable select"),
-								},
-							},
-						},
-					},
-				},
-			})
-		} else {
-			handlers = append(handlers, &dst.CallExpr{
-				Fun: t.newRuntimeSelector("DefaultSelector"),
-			})
-		}
-
-		if len(copyStmt.Lhs) > 0 {
-			c.InsertBefore(copyStmt)
-		}
-
-		if !valUsed {
-			selectVal = "_"
-		}
-		if !okUsed {
-			selectOk = "_"
-		}
-
-		var call dst.Expr
-		if hasDefault && counter == 1 {
-			// special case
-			call = handlers[0]
-			sel := call.(*dst.CallExpr).Fun.(*dst.SelectorExpr).Sel
-			sel.Name = "Select" + strings.TrimSuffix(sel.Name, "Selector") + "OrDefault"
-		} else {
-			call = &dst.CallExpr{
-				Fun:  t.newRuntimeSelector("Select"),
-				Args: handlers,
-			}
-		}
-
-		replacement := &dst.SwitchStmt{
-			Decs: dst.SwitchStmtDecorations{
-				NodeDecs: selectStmt.Decs.NodeDecs,
-				Switch:   selectStmt.Decs.Select,
-			},
-			Init: &dst.AssignStmt{
-				Lhs: []dst.Expr{
-					dst.NewIdent(selectIdx),
-					dst.NewIdent(selectVal),
-					dst.NewIdent(selectOk),
-				},
-				Tok: token.DEFINE,
-				Rhs: []dst.Expr{call},
-			},
-			Tag: dst.NewIdent(selectIdx),
-			Body: &dst.BlockStmt{
-				List: clauses,
-			},
-		}
-		c.Replace(replacement)
+	selectStmt, ok := c.Node().(*dst.SelectStmt)
+	if !ok {
+		return
 	}
+
+	handlers := []dst.Expr{}
+	var clauses []dst.Stmt
+
+	copyStmt := &dst.AssignStmt{
+		Lhs: []dst.Expr{},
+		Tok: token.DEFINE,
+		Rhs: []dst.Expr{},
+	}
+
+	suffix := t.suffix()
+	selectIdx := "idx" + suffix
+	selectVal := "val" + suffix
+	valUsed := false
+	selectOk := "ok" + suffix
+	okUsed := false
+
+	hasDefault := false
+
+	counter := 0
+
+	for _, clause := range selectStmt.Body.List {
+		clause := clause.(*dst.CommClause)
+
+		isDefault := false
+		var handler dst.Expr
+
+		if sendStmt, ok := clause.Comm.(*dst.SendStmt); ok {
+			ch, _ := t.chanForRewrite(sendStmt.Chan)
+			handler = &dst.CallExpr{
+				Fun:  &dst.SelectorExpr{X: ch, Sel: dst.NewIdent("SendSelector")},
+				Args: []dst.Expr{sendStmt.Value},
+			}
+		} else if exprStmt, ok := clause.Comm.(*dst.ExprStmt); ok {
+			recvExpr, ok := isRecvExpr(exprStmt.X)
+			if !ok {
+				log.Fatal("bad recv expr")
+			}
+			ch, _ := t.chanForRewrite(recvExpr.X)
+			handler = &dst.CallExpr{
+				Fun: &dst.SelectorExpr{X: ch, Sel: dst.NewIdent("RecvSelector")},
+			}
+		} else if assignStmt, ok := clause.Comm.(*dst.AssignStmt); ok {
+			if len(assignStmt.Rhs) != 1 {
+				log.Fatal("bad recv assign stmt")
+			}
+			recvExpr, ok := isRecvExpr(assignStmt.Rhs[0])
+			if !ok {
+				log.Fatal("bad recv expr")
+			}
+
+			typ, _ := t.isChanType(recvExpr.X)
+
+			lhs := assignStmt.Lhs
+			rhs := []dst.Expr{
+				&dst.CallExpr{
+					Fun: &dst.IndexExpr{
+						X:     t.newRuntimeSelector("ChanCast"),
+						Index: t.makeTypeExpr(typ.Type.Elem()),
+					},
+					Args: []dst.Expr{dst.NewIdent(selectVal)},
+				},
+			}
+			valUsed = true
+			if len(lhs) > 1 {
+				rhs = append(rhs, dst.NewIdent(selectOk))
+				okUsed = true
+			}
+
+			clause.Body = append([]dst.Stmt{
+				&dst.AssignStmt{
+					Lhs: lhs,
+					Tok: assignStmt.Tok,
+					Rhs: rhs,
+					Decs: dst.AssignStmtDecorations{
+						NodeDecs: dst.NodeDecs{
+							End: clause.Decs.Comm,
+						},
+					},
+				},
+			}, clause.Body...)
+
+			ch, _ := t.chanForRewrite(recvExpr.X)
+			handler = &dst.CallExpr{
+				Fun: &dst.SelectorExpr{X: ch, Sel: dst.NewIdent("RecvSelector")},
+			}
+		} else if clause.Comm == nil {
+			hasDefault = true
+			isDefault = true
+		} else {
+			panic("help")
+		}
+
+		var caseList []dst.Expr
+		if !isDefault {
+			caseList = []dst.Expr{&dst.BasicLit{Kind: token.INT, Value: fmt.Sprint(counter)}}
+			counter++
+			handlers = append(handlers, handler)
+		}
+		clauses = append(clauses, &dst.CaseClause{
+			List: caseList,
+			Body: clause.Body,
+			Decs: dst.CaseClauseDecorations{
+				NodeDecs: clause.Decs.NodeDecs,
+				Case:     clause.Decs.Case,
+				Colon:    clause.Decs.Colon,
+			},
+		})
+	}
+
+	if !hasDefault {
+		// output a default case to help the compiler understand we will never pass over this select
+		clauses = append(clauses, &dst.CaseClause{
+			// stick this case at the original closing bracket to help comments find their way
+			List: nil, // default
+			Body: []dst.Stmt{
+				&dst.ExprStmt{
+					X: &dst.CallExpr{
+						Fun: dst.NewIdent("panic"),
+						Args: []dst.Expr{
+							&dst.BasicLit{
+								Kind:  token.STRING,
+								Value: strconv.Quote("unreachable select"),
+							},
+						},
+					},
+				},
+			},
+		})
+	} else {
+		handlers = append(handlers, &dst.CallExpr{
+			Fun: t.newRuntimeSelector("DefaultSelector"),
+		})
+	}
+
+	if len(copyStmt.Lhs) > 0 {
+		c.InsertBefore(copyStmt)
+	}
+
+	if !valUsed {
+		selectVal = "_"
+	}
+	if !okUsed {
+		selectOk = "_"
+	}
+
+	var call dst.Expr
+	if hasDefault && counter == 1 {
+		// special case
+		call = handlers[0]
+		sel := call.(*dst.CallExpr).Fun.(*dst.SelectorExpr).Sel
+		sel.Name = "Select" + strings.TrimSuffix(sel.Name, "Selector") + "OrDefault"
+	} else {
+		call = &dst.CallExpr{
+			Fun:  t.newRuntimeSelector("Select"),
+			Args: handlers,
+		}
+	}
+
+	c.Replace(&dst.SwitchStmt{
+		Decs: dst.SwitchStmtDecorations{
+			NodeDecs: selectStmt.Decs.NodeDecs,
+			Switch:   selectStmt.Decs.Select,
+		},
+		Init: &dst.AssignStmt{
+			Lhs: []dst.Expr{
+				dst.NewIdent(selectIdx),
+				dst.NewIdent(selectVal),
+				dst.NewIdent(selectOk),
+			},
+			Tok: token.DEFINE,
+			Rhs: []dst.Expr{call},
+		},
+		Tag: dst.NewIdent(selectIdx),
+		Body: &dst.BlockStmt{
+			List: clauses,
+		},
+	})
 }

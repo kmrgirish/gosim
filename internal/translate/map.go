@@ -161,7 +161,7 @@ func (t *packageTranslator) rewriteMakeMap(c *dstutil.Cursor) {
 	}
 }
 
-func (t *packageTranslator) rewriteMapLiteral(c *dstutil.Cursor) {
+func (t *packageTranslator) rewriteMapNil(c *dstutil.Cursor) {
 	// map literal
 	if ident, ok := c.Node().(*dst.Ident); ok && ident.Name == "nil" {
 		if mapType, ok := t.isMapType(ident); ok {
@@ -175,75 +175,89 @@ func (t *packageTranslator) rewriteMapLiteral(c *dstutil.Cursor) {
 				},
 			}, mapType))
 		}
-	} else if compositeLit, ok := c.Node().(*dst.CompositeLit); ok {
-		if typ, ok := t.isMapType(compositeLit); ok {
-			var pairs []dst.Expr
-			for _, elt := range compositeLit.Elts {
-				kv, ok := elt.(*dst.KeyValueExpr)
-				if !ok {
-					log.Fatal("map composite lit elt is not keyvalueexpr")
-				}
-				nodeDecs := kv.Decs.NodeDecs
-				kv.Decs.NodeDecs = dst.NodeDecs{
-					Start: nodeDecs.Start,
-				}
-				nodeDecs.Start = nil
+	}
+}
 
-				key := t.apply(kv.Key).(dst.Expr)
-				value := t.apply(kv.Value).(dst.Expr)
+func (t *packageTranslator) rewriteMapLiteral(c *dstutil.Cursor) {
+	// map literal
+	compositeLit, ok := c.Node().(*dst.CompositeLit)
+	if !ok {
+		return
+	}
+	typ, ok := t.isMapType(compositeLit)
+	if !ok {
+		return
+	}
 
-				if nestedLit, ok := key.(*dst.CompositeLit); ok && nestedLit.Type == nil {
-					nestedLit.Type = t.makeTypeExpr(typ.Type.Key())
-				}
-				if nestedLit, ok := value.(*dst.CompositeLit); ok && nestedLit.Type == nil {
-					// XXX: janky hack
-					if ptr, ok := typ.Type.Elem().Underlying().(*types.Pointer); ok {
-						nestedLit.Type = t.makeTypeExpr(ptr.Elem())
-						value = &dst.UnaryExpr{
-							Op: token.AND,
-							X:  value,
-						}
-					} else {
-						nestedLit.Type = t.makeTypeExpr(typ.Type.Elem())
-					}
-				}
+	var pairs []dst.Expr
+	for _, elt := range compositeLit.Elts {
+		kv, ok := elt.(*dst.KeyValueExpr)
+		if !ok {
+			log.Fatal("map composite lit elt is not keyvalueexpr")
+		}
+		nodeDecs := kv.Decs.NodeDecs
+		kv.Decs.NodeDecs = dst.NodeDecs{
+			Start: nodeDecs.Start,
+		}
+		nodeDecs.Start = nil
 
-				pairs = append(pairs, &dst.CompositeLit{
-					Elts: []dst.Expr{
-						&dst.KeyValueExpr{
-							Key:   dst.NewIdent("K"),
-							Value: key,
-						},
-						&dst.KeyValueExpr{
-							Key:   dst.NewIdent("V"),
-							Value: value,
-						},
-					},
-					Decs: dst.CompositeLitDecorations{
-						NodeDecs: nodeDecs,
-					},
-				})
+		key := t.apply(kv.Key).(dst.Expr)
+		value := t.apply(kv.Value).(dst.Expr)
+
+		if nestedLit, ok := key.(*dst.CompositeLit); ok && nestedLit.Type == nil {
+			nestedLit.Type = t.makeTypeExpr(typ.Type.Key())
+		}
+		if nestedLit, ok := value.(*dst.CompositeLit); ok && nestedLit.Type == nil {
+			// XXX: janky hack
+			if ptr, ok := typ.Type.Elem().Underlying().(*types.Pointer); ok {
+				nestedLit.Type = t.makeTypeExpr(ptr.Elem())
+				value = &dst.UnaryExpr{
+					Op: token.AND,
+					X:  value,
+				}
+			} else {
+				nestedLit.Type = t.makeTypeExpr(typ.Type.Elem())
 			}
+		}
 
-			c.Replace(t.maybeConvertMapType(&dst.CallExpr{
-				Fun: t.newRuntimeSelector("MapLiteral"),
-				Args: []dst.Expr{
-					&dst.CompositeLit{
-						Type: &dst.ArrayType{
-							Elt: &dst.IndexListExpr{
-								X: t.newRuntimeSelector("KV"),
-								Indices: []dst.Expr{
-									t.makeTypeExpr(typ.Type.Key()),
-									t.makeTypeExpr(typ.Type.Elem()),
-								},
-							},
+		pairs = append(pairs, &dst.CompositeLit{
+			Elts: []dst.Expr{
+				&dst.KeyValueExpr{
+					Key:   dst.NewIdent("K"),
+					Value: key,
+				},
+				&dst.KeyValueExpr{
+					Key:   dst.NewIdent("V"),
+					Value: value,
+				},
+			},
+			Decs: dst.CompositeLitDecorations{
+				NodeDecs: nodeDecs,
+			},
+		})
+	}
+
+	c.Replace(t.maybeConvertMapType(&dst.CallExpr{
+		Fun: t.newRuntimeSelector("MapLiteral"),
+		Args: []dst.Expr{
+			&dst.CompositeLit{
+				Type: &dst.ArrayType{
+					Elt: &dst.IndexListExpr{
+						X: t.newRuntimeSelector("KV"),
+						Indices: []dst.Expr{
+							t.makeTypeExpr(typ.Type.Key()),
+							t.makeTypeExpr(typ.Type.Elem()),
 						},
-						Elts: pairs,
 					},
 				},
-			}, typ))
-		}
-	} else if expr, ok := c.Node().(dst.Expr); ok {
+				Elts: pairs,
+			},
+		},
+	}, typ))
+}
+
+func (t *packageTranslator) rewriteMapImplicitConversion(c *dstutil.Cursor) {
+	if expr, ok := c.Node().(dst.Expr); ok {
 		astExpr, _ := t.astMap.Nodes[expr].(ast.Expr)
 		if typ, ok := t.implicitConversions[astExpr]; ok {
 			if _, ok := isTypMapType(typ); ok {
@@ -348,76 +362,52 @@ func isOpAssign(tok token.Token) (token.Token, bool) {
 	return out, ok
 }
 
-type mapModifyInfo struct {
-	copyVarsStmt dst.Stmt
-	writeExpr    dst.Expr
-}
+func (t *packageTranslator) replaceWithMapModify(c *dstutil.Cursor, x, index dst.Expr, op token.Token, val dst.Expr) {
+	suffix := t.suffix()
+	keyName := "key" + suffix
+	mapName := "map" + suffix
 
-type mapAssignInfo struct {
-	mapModify func(op token.Token, val dst.Expr) mapModifyInfo
-	mapSet    func(val dst.Expr) dst.Expr
-}
-
-func (t *packageTranslator) isMapAssign(lhs dst.Expr) (mapAssignInfo, bool) {
-	x, index, ok := t.mapIndexForRewrite(lhs)
-	if !ok {
-		return mapAssignInfo{}, false
+	copyVarsStmt := &dst.AssignStmt{
+		Lhs: []dst.Expr{dst.NewIdent(mapName), dst.NewIdent(keyName)},
+		Tok: token.DEFINE,
+		Rhs: []dst.Expr{x, index},
 	}
+	c.InsertBefore(copyVarsStmt)
 
-	return mapAssignInfo{
-		mapModify: func(op token.Token, val dst.Expr) mapModifyInfo {
-			suffix := t.suffix()
-			keyName := "key" + suffix
-			mapName := "map" + suffix
-			return mapModifyInfo{
-				copyVarsStmt: &dst.AssignStmt{
-					Lhs: []dst.Expr{dst.NewIdent(mapName), dst.NewIdent(keyName)},
-					Tok: token.DEFINE,
-					Rhs: []dst.Expr{x, index},
-				},
-				writeExpr: &dst.CallExpr{
+	writeExpr := &dst.CallExpr{
+		Fun: &dst.SelectorExpr{
+			X:   dst.NewIdent(mapName),
+			Sel: dst.NewIdent("Set"),
+		},
+		Args: []dst.Expr{
+			dst.NewIdent(keyName),
+			&dst.BinaryExpr{
+				X: &dst.CallExpr{
 					Fun: &dst.SelectorExpr{
 						X:   dst.NewIdent(mapName),
-						Sel: dst.NewIdent("Set"),
+						Sel: dst.NewIdent("Get"),
 					},
 					Args: []dst.Expr{
 						dst.NewIdent(keyName),
-						&dst.BinaryExpr{
-							X: &dst.CallExpr{
-								Fun: &dst.SelectorExpr{
-									X:   dst.NewIdent(mapName),
-									Sel: dst.NewIdent("Get"),
-								},
-								Args: []dst.Expr{
-									dst.NewIdent(keyName),
-								},
-							},
-							Op: op,
-							Y:  t.apply(val).(dst.Expr),
-						},
 					},
 				},
-			}
+				Op: op,
+				Y:  t.apply(val).(dst.Expr),
+			},
 		},
-		mapSet: func(val dst.Expr) dst.Expr {
-			return &dst.CallExpr{
-				Fun: &dst.SelectorExpr{
-					X:   x,
-					Sel: dst.NewIdent("Set"),
-				},
-				Args: []dst.Expr{
-					index,
-					t.apply(val).(dst.Expr),
-				},
-			}
+	}
+	c.Replace(&dst.ExprStmt{
+		Decs: dst.ExprStmtDecorations{
+			NodeDecs: *c.Node().Decorations(),
 		},
-	}, true
+		X: writeExpr,
+	})
 }
 
 func (t *packageTranslator) rewriteMapAssign(c *dstutil.Cursor) {
 	// "m[x]++""
 	if incDecStmt, ok := c.Node().(*dst.IncDecStmt); ok {
-		info, ok := t.isMapAssign(incDecStmt.X)
+		x, index, ok := t.mapIndexForRewrite(incDecStmt.X)
 		if !ok {
 			return
 		}
@@ -427,14 +417,8 @@ func (t *packageTranslator) rewriteMapAssign(c *dstutil.Cursor) {
 			token.DEC: token.SUB,
 		}[incDecStmt.Tok]
 
-		info2 := info.mapModify(op, &dst.BasicLit{Kind: token.INT, Value: "1"})
-		c.InsertBefore(info2.copyVarsStmt)
-		c.Replace(&dst.ExprStmt{
-			Decs: dst.ExprStmtDecorations{
-				NodeDecs: incDecStmt.Decs.NodeDecs,
-			},
-			X: info2.writeExpr,
-		})
+		t.replaceWithMapModify(c, x, index, op, &dst.BasicLit{Kind: token.INT, Value: "1"})
+		return
 	}
 
 	// "m[x] =" or "m[x] +="
@@ -443,82 +427,88 @@ func (t *packageTranslator) rewriteMapAssign(c *dstutil.Cursor) {
 		return
 	}
 
-	hasAnyMaps := false
-	for _, lhs := range assignStmt.Lhs {
-		if _, ok := t.isMapAssign(lhs); ok {
-			hasAnyMaps = true
-		}
-	}
-	if !hasAnyMaps {
-		return
-	}
-
 	if op, ok := isOpAssign(assignStmt.Tok); ok {
 		// m[x] +=
-
 		if len(assignStmt.Lhs) != 1 || len(assignStmt.Rhs) != 1 {
 			panic("special assign with multiple lhs or rhs?")
 		}
+		x, index, ok := t.mapIndexForRewrite(assignStmt.Lhs[0])
+		if !ok {
+			return
+		}
+		t.replaceWithMapModify(c, x, index, op, assignStmt.Rhs[0])
+		return
+	}
 
-		info, _ := t.isMapAssign(assignStmt.Lhs[0])
-		info2 := info.mapModify(op, assignStmt.Rhs[0])
-		c.InsertBefore(info2.copyVarsStmt)
-		c.Replace(&dst.ExprStmt{
-			Decs: dst.ExprStmtDecorations{
-				NodeDecs: assignStmt.Decs.NodeDecs,
-			},
-			X: info2.writeExpr,
-		})
-
-	} else if len(assignStmt.Lhs) == 1 {
+	if len(assignStmt.Lhs) == 1 {
 		// m[x] =
-		info, _ := t.isMapAssign(assignStmt.Lhs[0])
+		x, index, ok := t.mapIndexForRewrite(assignStmt.Lhs[0])
+		if !ok {
+			return
+		}
 		c.Replace(&dst.ExprStmt{
 			Decs: dst.ExprStmtDecorations{
 				NodeDecs: assignStmt.Decs.NodeDecs,
 			},
-			X: info.mapSet(assignStmt.Rhs[0]),
+			X: &dst.CallExpr{
+				Fun: &dst.SelectorExpr{
+					X:   x,
+					Sel: dst.NewIdent("Set"),
+				},
+				Args: []dst.Expr{
+					index,
+					t.apply(assignStmt.Rhs[0]).(dst.Expr),
+				},
+			},
 		})
+		return
+	}
 
-	} else {
-		// m[x], m[y], a, b =
+	// m[x], m[y], a, b =
+	for i, lhs := range assignStmt.Lhs {
+		x, index, ok := t.mapIndexForRewrite(lhs)
+		if !ok {
+			continue
+		}
+
 		if assignStmt.Tok != token.ASSIGN {
 			panic("non-name on left side of := ?")
 		}
 
-		for i, lhs := range assignStmt.Lhs {
-			info, ok := t.isMapAssign(lhs)
-			if !ok {
-				continue
-			}
+		// get the type of the map again, now for a temp var
+		indexExpr := lhs.(*dst.IndexExpr)
+		mapType, _ := t.isMapType(indexExpr.X)
+		elemType := mapType.Type.Elem()
 
-			// get the type of the map again,
-			// now for a temp var
-			index := lhs.(*dst.IndexExpr)
-			mapType, _ := t.isMapType(index.X)
-			elemType := mapType.Type.Elem()
-
-			tmp := "val" + t.suffix()
-			c.InsertBefore(&dst.DeclStmt{
-				Decl: &dst.GenDecl{
-					Tok: token.VAR,
-					Specs: []dst.Spec{
-						&dst.ValueSpec{
-							Names: []*dst.Ident{
-								dst.NewIdent(tmp),
-							},
-							Type: t.makeTypeExpr(elemType),
+		tmp := "val" + t.suffix()
+		c.InsertBefore(&dst.DeclStmt{
+			Decl: &dst.GenDecl{
+				Tok: token.VAR,
+				Specs: []dst.Spec{
+					&dst.ValueSpec{
+						Names: []*dst.Ident{
+							dst.NewIdent(tmp),
 						},
+						Type: t.makeTypeExpr(elemType),
 					},
 				},
-			})
-			assignStmt.Lhs[i] = dst.NewIdent(tmp)
-			c.InsertAfter(&dst.ExprStmt{
-				Decs: dst.ExprStmtDecorations{
-					NodeDecs: assignStmt.Decs.NodeDecs,
+			},
+		})
+		assignStmt.Lhs[i] = dst.NewIdent(tmp)
+		c.InsertAfter(&dst.ExprStmt{
+			Decs: dst.ExprStmtDecorations{
+				NodeDecs: assignStmt.Decs.NodeDecs,
+			},
+			X: &dst.CallExpr{
+				Fun: &dst.SelectorExpr{
+					X:   x,
+					Sel: dst.NewIdent("Set"),
 				},
-				X: info.mapSet(dst.NewIdent(tmp)),
-			})
-		}
+				Args: []dst.Expr{
+					index,
+					dst.NewIdent(tmp),
+				},
+			},
+		})
 	}
 }
