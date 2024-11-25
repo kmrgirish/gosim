@@ -84,6 +84,13 @@ var hooksGo123 = map[packageSelector]packageSelector{
 	{Pkg: "os", Selector: "ignoreSIGSYS"}:       {Pkg: hooksGo123Package},
 	{Pkg: "os", Selector: "restoreSIGSYS"}:      {Pkg: hooksGo123Package},
 
+	{Pkg: "os/signal", Selector: "signalWaitUntilIdle"}: {Pkg: hooksGo123Package},
+	{Pkg: "os/signal", Selector: "signal_disable"}:      {Pkg: hooksGo123Package},
+	{Pkg: "os/signal", Selector: "signal_enable"}:       {Pkg: hooksGo123Package},
+	{Pkg: "os/signal", Selector: "signal_ignore"}:       {Pkg: hooksGo123Package},
+	{Pkg: "os/signal", Selector: "signal_ignored"}:      {Pkg: hooksGo123Package},
+	{Pkg: "os/signal", Selector: "signal_recv"}:         {Pkg: hooksGo123Package},
+
 	{Pkg: "runtime/debug", Selector: "SetTraceback"}:    {Pkg: hooksGo123Package},
 	{Pkg: "runtime/debug", Selector: "WriteHeapDump"}:   {Pkg: hooksGo123Package},
 	{Pkg: "runtime/debug", Selector: "freeOSMemory"}:    {Pkg: hooksGo123Package},

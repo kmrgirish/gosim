@@ -37,7 +37,6 @@ var skippedPackagesGo123 = map[string]bool{
 
 	"unsafe": true,
 
-	"os/signal":        true, // XXX for now
 	"runtime/coverage": true, // XXX for now
 	"runtime/metrics":  true, // XXX for now
 	"runtime/pprof":    true, // XXX for now
