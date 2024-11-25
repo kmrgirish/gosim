@@ -15,5 +15,6 @@ func OsSignal_signal_ignored(uint32) bool {
 }
 
 func OsSignal_signal_recv() uint32 {
-	return 0
+	// block forever
+	select {}
 }
