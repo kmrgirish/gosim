@@ -1376,12 +1376,19 @@ func (l *LinuxOS) SysMmap(addr uintptr, length uintptr, prot int, flags int, fd 
 
 	logf("mmap %d %d %d %d %d %d", addr, length, prot, flags, fd, offset)
 
+	if length > 16*1024*1024 {
+		logf("mmap too big")
+		return 0, syscall.EINVAL
+	}
+
 	if addr != 0 {
 		return 0, syscall.EINVAL
 	}
 	if prot != syscall.PROT_READ {
 		return 0, syscall.EINVAL
 	}
+
+	flags &= ^syscall.MAP_POPULATE // ignore MAP_POPULATE
 	if flags != syscall.MAP_SHARED {
 		return 0, syscall.EINVAL
 	}
