@@ -18,6 +18,22 @@ func TestReflectFormatMap(t *testing.T) {
 	}
 }
 
+func TestReflectFormatMapInterface(t *testing.T) {
+	type Foo struct {
+		Bar int
+	}
+
+	x := Foo{Bar: 3}
+	y := Foo{Bar: 5}
+
+	formatted1 := fmt.Sprint(map[any]int{"foo": 1, "bar": 2, x: 3, y: 4, &x: 10, &y: 11})
+	formatted2 := fmt.Sprint(map[any]int{"foo": 1, "bar": 2, x: 3, y: 4, &x: 10, &y: 11})
+	t.Log(formatted1)
+	if formatted1 != formatted2 {
+		t.Error(formatted1)
+	}
+}
+
 func TestReflectMapValue(t *testing.T) {
 	m := make(map[int]string)
 

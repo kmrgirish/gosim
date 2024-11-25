@@ -92,7 +92,7 @@ func Select(cases []SelectCase) (chosen int, recv Value, recvOK bool) {
 }
 
 func MakeSlice(typ Type, len, cap int) Value {
-	return wrapValue(reflect.MakeSlice(typ.(typeImpl).inner, len, cap))
+	return wrapValue(reflect.MakeSlice(typ.(*typeImpl).inner, len, cap))
 }
 
 func MakeChan(typ Type, buffer int) Value {
@@ -100,7 +100,7 @@ func MakeChan(typ Type, buffer int) Value {
 }
 
 func getDecriptor(typ Type) gosimruntime.ReflectMapType {
-	implPtrTyp := typ.(typeImpl).inner.Field(0).Type
+	implPtrTyp := typ.(*typeImpl).inner.Field(0).Type
 	zeroImplPtr := reflect.Zero(implPtrTyp)
 	mapInterface := zeroImplPtr.Interface().(gosimruntime.ReflectMap)
 	return mapInterface.Type()
@@ -108,7 +108,7 @@ func getDecriptor(typ Type) gosimruntime.ReflectMapType {
 
 func MakeMap(typ Type) Value {
 	if typ.Kind() != reflect.Map {
-		reflect.MakeMap(typ.(typeImpl).inner)
+		reflect.MakeMap(typ.(*typeImpl).inner)
 		panic("unreachable")
 	}
 
@@ -130,15 +130,15 @@ func ValueOf(i any) Value {
 }
 
 func Zero(typ Type) Value {
-	return wrapValue(reflect.Zero(typ.(typeImpl).inner))
+	return wrapValue(reflect.Zero(typ.(*typeImpl).inner))
 }
 
 func New(typ Type) Value {
-	return wrapValue(reflect.New(typ.(typeImpl).inner))
+	return wrapValue(reflect.New(typ.(*typeImpl).inner))
 }
 
 func NewAt(typ Type, p unsafe.Pointer) Value {
-	return wrapValue(reflect.NewAt(typ.(typeImpl).inner, p))
+	return wrapValue(reflect.NewAt(typ.(*typeImpl).inner, p))
 }
 
 func (v Value) Addr() Value {
@@ -539,11 +539,11 @@ func (v Value) Clear() {
 }
 
 func (v Value) Convert(t Type) Value {
-	return wrapValue(v.inner.Convert(t.(typeImpl).inner))
+	return wrapValue(v.inner.Convert(t.(*typeImpl).inner))
 }
 
 func (v Value) CanConvert(t Type) bool {
-	return v.inner.CanConvert(t.(typeImpl).inner)
+	return v.inner.CanConvert(t.(*typeImpl).inner)
 }
 
 func (v Value) Comparable() bool {
