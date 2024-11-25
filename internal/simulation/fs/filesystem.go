@@ -1045,7 +1045,10 @@ func (fs *Filesystem) GetInodeInfo(inode int) InodeInfo {
 }
 
 func (fs *Filesystem) walkpath(baseInode int, path string, keepLast bool) (inode int, entry string, err error) {
-	if path[0:1] == "/" {
+	// TODO: harden and test; this function and its callers are not not well
+	// tested and brittle
+
+	if len(path) > 0 && path[0:1] == "/" {
 		baseInode = RootInode
 	}
 
