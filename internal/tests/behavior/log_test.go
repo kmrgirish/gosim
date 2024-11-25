@@ -3,6 +3,7 @@
 package behavior_test
 
 import (
+	"fmt"
 	"log"
 	"log/slog"
 	"os"
@@ -61,4 +62,16 @@ func TestLogForPrettyTest(t *testing.T) {
 	})
 	m.Wait()
 	log.Println("never")
+}
+
+func init() {
+	// logs during init will print to stdout/stderr bypassing the gosim handler
+	if os.Getenv("LOGDURINGINIT") == "1" {
+		fmt.Println("hello")
+		slog.Info("help")
+	}
+}
+
+func TestLogDuringInit(t *testing.T) {
+	// logs in above init() should print
 }

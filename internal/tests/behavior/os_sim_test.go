@@ -41,3 +41,30 @@ func TestGetpagesize(t *testing.T) {
 		t.Fatalf("bad page size %d", pgsize)
 	}
 }
+
+var globalHostname string
+
+func init() {
+	globalHostname, _ = os.Hostname()
+}
+
+func TestSyscallsDuringInit(t *testing.T) {
+	// Test that os.Hostname() called in an init func can make syscalls.
+
+	expected := "main"
+	if globalHostname != expected {
+		t.Errorf("bad name %q, expected %q", globalHostname, expected)
+	}
+
+	m := gosim.NewMachine(gosim.MachineConfig{
+		Label: "hello123",
+		MainFunc: func() {
+			expected := "hello123"
+			if globalHostname != expected {
+				t.Errorf("bad name %q, expected %q", globalHostname, expected)
+			}
+		},
+	})
+
+	m.Wait()
+}

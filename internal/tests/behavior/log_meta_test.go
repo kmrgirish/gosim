@@ -33,7 +33,7 @@ func parseLog(t *testing.T, log []byte) []map[string]any {
 	return logs
 }
 
-func TestMetaLogMachineGoroutineTime(t *testing.T) {
+func TestLogMachineGoroutineTime(t *testing.T) {
 	mt := metatesting.ForCurrentPackage(t)
 	run, err := mt.Run(t, &metatesting.RunConfig{
 		Test: "TestLogMachineGoroutineTime",
@@ -55,7 +55,7 @@ func TestMetaLogMachineGoroutineTime(t *testing.T) {
 	}
 }
 
-func TestMetaLogSLog(t *testing.T) {
+func TestLogSLog(t *testing.T) {
 	mt := metatesting.ForCurrentPackage(t)
 	run, err := mt.Run(t, &metatesting.RunConfig{
 		Test: "TestLogSLog",
@@ -74,7 +74,7 @@ func TestMetaLogSLog(t *testing.T) {
 	}
 }
 
-func TestMetaStdoutStderr(t *testing.T) {
+func TestStdoutStderr(t *testing.T) {
 	mt := metatesting.ForCurrentPackage(t)
 	run, err := mt.Run(t, &metatesting.RunConfig{
 		Test: "TestStdoutStderr",
@@ -87,6 +87,29 @@ func TestMetaStdoutStderr(t *testing.T) {
 	actual := parseLog(t, run.LogOutput)
 	expected := parseLog(t, []byte(`{"time":"2020-01-15T14:10:03.000001234Z","level":"INFO","msg":"hello","machine":"os","method":"stdout","from":"main","goroutine":1,"step":1}
 {"time":"2020-01-15T14:10:03.000001234Z","level":"INFO","msg":"goodbye","machine":"os","method":"stderr","from":"main","goroutine":1,"step":2}
+`))
+
+	if diff := cmp.Diff(expected, actual); diff != "" {
+		t.Error("diff", diff)
+	}
+}
+
+func TestLogDuringInit(t *testing.T) {
+	mt := metatesting.ForCurrentPackage(t)
+	run, err := mt.Run(t, &metatesting.RunConfig{
+		Test: "TestLogDuringInit",
+		Seed: 1,
+		ExtraEnv: []string{
+			"LOGDURINGINIT=1",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	actual := parseLog(t, run.LogOutput)
+	expected := parseLog(t, []byte(`{"time":"2020-01-15T14:10:03.000001234Z","level":"INFO","msg":"hello\n","machine":"os","method":"stdout","from":"main","goroutine":1,"step":1}
+{"time":"2020-01-15T14:10:03.000001234Z","level":"INFO","msg":"2020/01/15 14:10:03 INFO help\n","machine":"os","method":"stderr","from":"main","goroutine":1,"step":2}
 `))
 
 	if diff := cmp.Diff(expected, actual); diff != "" {

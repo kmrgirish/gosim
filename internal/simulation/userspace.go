@@ -74,7 +74,8 @@ func setupSlog(machineLabel string) {
 		panic(err)
 	}
 
-	// TODO: capture stdout? stderr?
+	// stdout and stderr are currently captured with some special logic in
+	// LinuxOS for writes to their file descriptors, see TestStdoutStderr.
 
 	ho := slog.HandlerOptions{
 		Level:     level,
@@ -91,14 +92,15 @@ func setupSlog(machineLabel string) {
 }
 
 func setupUserspace(gosimOS_ *GosimOS, linuxOS_ *LinuxOS, machineID int, label string) {
-	// XXX: does logging work during global init?
-	gosimruntime.InitGlobals(false, false)
-
-	// yikes... how do we order this? should machine exist first? should these happen in an init() in here SOMEHOW? short-circuit this package?
-	// XXX: provide directoyr
+	// initialize gosimOS etc. before invoking initializers so that init() calls
+	// can make syscalls, see TestSyscallsDuringInit.
 	gosimOS = gosimOS_
 	linuxOS = linuxOS_
 	currentMachineID = machineID
 
+	gosimruntime.InitGlobals(false, false)
+
+	// setupSlog only works once globals are initialized.  logs during init are
+	// printed to stdout/stderr, see TestLogDuringInit.
 	setupSlog(label)
 }
