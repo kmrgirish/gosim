@@ -327,6 +327,111 @@ func TestChanLenCap(t *testing.T) {
 	}
 }
 
+func TestChanNilChanSend(t *testing.T) {
+	var ch chan struct{}
+
+	go func() {
+		ch <- struct{}{}
+		panic("should've blocked")
+	}()
+
+	time.Sleep(10 * time.Millisecond)
+}
+
+func TestChanNilChanSendSelectOne(t *testing.T) {
+	var ch chan struct{}
+
+	go func() {
+		select {
+		case ch <- struct{}{}:
+		}
+		panic("should've blocked")
+	}()
+
+	time.Sleep(10 * time.Millisecond)
+}
+
+func TestChanNilChanSendSelectDefault(t *testing.T) {
+	var ch chan struct{}
+
+	select {
+	case ch <- struct{}{}:
+		panic("should've blocked")
+	default:
+	}
+}
+
+func TestChanNilChanSendSelectMore(t *testing.T) {
+	var ch chan struct{}
+	chOk := make(chan struct{}, 1)
+
+	select {
+	case ch <- struct{}{}:
+		panic("should've blocked")
+	case chOk <- struct{}{}:
+	default:
+	}
+}
+
+func TestChanNilChanRecv(t *testing.T) {
+	var ch chan struct{}
+
+	go func() {
+		<-ch
+		panic("should've blocked")
+	}()
+
+	time.Sleep(10 * time.Millisecond)
+}
+
+func TestChanNilChanRecvOk(t *testing.T) {
+	var ch chan struct{}
+
+	go func() {
+		_, ok := <-ch
+		_ = ok
+		panic("should've blocked")
+	}()
+
+	time.Sleep(10 * time.Millisecond)
+}
+
+func TestChanNilChanRecvSelectOne(t *testing.T) {
+	var ch chan struct{}
+
+	go func() {
+		select {
+		case <-ch:
+		}
+		panic("should've blocked")
+	}()
+
+	time.Sleep(10 * time.Millisecond)
+}
+
+func TestChanNilChanRecvSelectDefault(t *testing.T) {
+	var ch chan struct{}
+
+	select {
+	case <-ch:
+		panic("should've blocked")
+	default:
+	}
+}
+
+func TestChanNilChanRecvSelectMore(t *testing.T) {
+	var ch chan struct{}
+	chOk := make(chan struct{}, 1)
+	chOk <- struct{}{}
+
+	select {
+	case <-ch:
+		panic("should've blocked")
+	case <-chOk:
+	default:
+	}
+}
+
 // XXX: what if you do something crazy like send and recv on the same channel in a select?
 
 // XXX: what if you have a select on a zero-length channel that has a writer ready to go

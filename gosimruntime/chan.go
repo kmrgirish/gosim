@@ -209,6 +209,9 @@ func (c Chan[V]) send(v V) {
 //go:norace
 func (c Chan[V]) Send(v V) {
 	g := getg()
+	if c.impl == nil {
+		g.wait()
+	}
 	g.yield()
 
 	if race.Enabled {
@@ -324,6 +327,9 @@ func (c Chan[V]) recvOk() (V, bool) {
 //go:norace
 func (c Chan[V]) RecvOk() (V, bool) {
 	g := getg()
+	if c.impl == nil {
+		g.wait()
+	}
 	g.yield()
 	if !c.canRecv() {
 		sudog := g.allocWaiter()
@@ -396,6 +402,9 @@ func (c sendSelector[V]) exec() (any, bool) {
 }
 
 func (c Chan[V]) SelectSendOrDefault(v V) (int, any, bool) {
+	if c.impl == nil {
+		return 1, nil, false
+	}
 	getg().yield()
 	if !c.canSend() {
 		return 1, nil, false
@@ -446,6 +455,9 @@ func (c recvSelector[V]) complete(ok bool) {
 }
 
 func (c Chan[V]) SendSelector(item V) ChanSelector {
+	if c.impl == nil {
+		return nilChanSelector{}
+	}
 	return sendSelector[V]{c: c, v: item}
 }
 
