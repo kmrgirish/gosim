@@ -519,10 +519,10 @@ func writeSyscalls(outputPath string, syscalls []syscallInfo, isMachine bool) {
 			dispatchArgs = append(dispatchArgs, p.Name)
 		}
 
-		if info.async {
-			dispatchArgs = append(dispatchArgs, "syscall")
-			ifaceArgs = append(ifaceArgs, "syscall *syscallabi.Syscall")
-		}
+		// if info.async {
+		dispatchArgs = append(dispatchArgs, "syscall")
+		ifaceArgs = append(ifaceArgs, "invocation *syscallabi.Syscall")
+		// }
 
 		parseCallerText := ""
 		parseDispatchText := ""

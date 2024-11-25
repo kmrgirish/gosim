@@ -57,6 +57,19 @@ func (w gosimLogWriter) Write(b []byte) (n int, err error) {
 
 var logInitialized = false
 
+func makeBaseSlogHandler() slog.Handler {
+	var level slog.Level
+	if err := level.UnmarshalText([]byte(os.Getenv("GOSIM_LOG_LEVEL"))); err != nil {
+		panic(err)
+	}
+
+	ho := slog.HandlerOptions{
+		Level:     level,
+		AddSource: true,
+	}
+	return slog.NewJSONHandler(gosimLogWriter{}, &ho)
+}
+
 func setupSlog(machineLabel string) {
 	// We play a funny game with the logger. There exists a default slog.Logger in
 	// every machine, since they all have their own set of globals. All loggers
@@ -67,21 +80,12 @@ func setupSlog(machineLabel string) {
 	// happens-before (this currently happens in the default handler which
 	// uses both a pool and a lock)
 
-	time.Local = time.UTC
-
-	var level slog.Level
-	if err := level.UnmarshalText([]byte(os.Getenv("GOSIM_LOG_LEVEL"))); err != nil {
-		panic(err)
-	}
-
 	// stdout and stderr are currently captured with some special logic in
 	// LinuxOS for writes to their file descriptors, see TestStdoutStderr.
 
-	ho := slog.HandlerOptions{
-		Level:     level,
-		AddSource: true,
-	}
-	handler := slog.NewJSONHandler(gosimLogWriter{}, &ho)
+	time.Local = time.UTC
+
+	handler := makeBaseSlogHandler()
 
 	// set short file flag so that we'll capture source info. see slog.SetDefault internals
 	// XXX: test this?

@@ -38,7 +38,7 @@ func trampolineSysFcntlFlock(syscall *syscallabi.Syscall) {
 	fd := uintptr(syscall.Int0)
 	cmd := int(syscall.Int1)
 	lk := syscallabi.NewValueView(syscall.Ptr2.(*Flock_t))
-	err := syscall.OS.(*LinuxOS).SysFcntlFlock(fd, cmd, lk)
+	err := syscall.OS.(*LinuxOS).SysFcntlFlock(fd, cmd, lk, syscall)
 	syscall.Errno = syscallabi.ErrErrno(err)
 	syscall.Complete()
 }

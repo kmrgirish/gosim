@@ -41,9 +41,11 @@ func TestLogMachineGoroutineTime(t *testing.T) {
 	<-done
 }
 
-func TestStdoutStderr(t *testing.T) {
-	os.Stdout.WriteString("hello")
-	os.Stderr.WriteString("goodbye")
+func TestLogStdoutStderr(t *testing.T) {
+	os.Stdout.WriteString("hello\n")
+	os.Stderr.WriteString("goodbye\n")
+	log.Println("same goroutine log")
+	slog.Info("same goroutine slog")
 }
 
 func TestLogForPrettyTest(t *testing.T) {
@@ -73,5 +75,11 @@ func init() {
 }
 
 func TestLogDuringInit(t *testing.T) {
-	// logs in above init() should print
+	// logs in above init() should print once for main
+
+	// logs should print for this machine also
+	gosim.NewMachine(gosim.MachineConfig{
+		Label:    "logm",
+		MainFunc: func() {},
+	}).Wait()
 }

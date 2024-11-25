@@ -3,6 +3,7 @@
 package simulation
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"io"
@@ -98,7 +99,7 @@ func (l *LinuxOS) allocFd() int {
 	return fd
 }
 
-func (l *LinuxOS) PollOpen(fd int, desc syscallabi.ValueView[syscallabi.PollDesc]) int {
+func (l *LinuxOS) PollOpen(fd int, desc syscallabi.ValueView[syscallabi.PollDesc], invocation *syscallabi.Syscall) int {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.shutdown {
@@ -118,7 +119,7 @@ func (l *LinuxOS) PollOpen(fd int, desc syscallabi.ValueView[syscallabi.PollDesc
 	return 0
 }
 
-func (l *LinuxOS) PollClose(fd int, desc syscallabi.ValueView[syscallabi.PollDesc]) int {
+func (l *LinuxOS) PollClose(fd int, desc syscallabi.ValueView[syscallabi.PollDesc], invocation *syscallabi.Syscall) int {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.shutdown {
@@ -205,7 +206,7 @@ func (l *LinuxOS) dirInodeForFd(dirfd int) (int, error) {
 	return l.workdirInode, nil
 }
 
-func (l *LinuxOS) SysOpenat(dirfd int, path string, flags int, mode uint32) (int, error) {
+func (l *LinuxOS) SysOpenat(dirfd int, path string, flags int, mode uint32, invocation *syscallabi.Syscall) (int, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.shutdown {
@@ -268,7 +269,7 @@ func (l *LinuxOS) SysOpenat(dirfd int, path string, flags int, mode uint32) (int
 	return fd, nil
 }
 
-func (l *LinuxOS) SysRenameat(olddirfd int, oldpath string, newdirfd int, newpath string) error {
+func (l *LinuxOS) SysRenameat(olddirfd int, oldpath string, newdirfd int, newpath string, invocation *syscallabi.Syscall) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.shutdown {
@@ -296,7 +297,7 @@ func (l *LinuxOS) SysRenameat(olddirfd int, oldpath string, newdirfd int, newpat
 	return nil
 }
 
-func (l *LinuxOS) SysGetdents64(fd int, data syscallabi.ByteSliceView) (int, error) {
+func (l *LinuxOS) SysGetdents64(fd int, data syscallabi.ByteSliceView, invocation *syscallabi.Syscall) (int, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.shutdown {
@@ -365,7 +366,7 @@ func (l *LinuxOS) SysGetdents64(fd int, data syscallabi.ByteSliceView) (int, err
 	return retn, nil
 }
 
-func (l *LinuxOS) SysWrite(fd int, data syscallabi.ByteSliceView) (int, error) {
+func (l *LinuxOS) SysWrite(fd int, data syscallabi.ByteSliceView, invocation *syscallabi.Syscall) (int, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.shutdown {
@@ -377,6 +378,9 @@ func (l *LinuxOS) SysWrite(fd int, data syscallabi.ByteSliceView) (int, error) {
 		data.Read(buf)
 		// TODO: use a custom machine here?
 
+		// TODO: iterate over buf line-by-line?
+		buf = bytes.TrimSuffix(buf, []byte("\n"))
+
 		var source string
 		if fd == syscall.Stdout {
 			source = "stdout"
@@ -384,7 +388,10 @@ func (l *LinuxOS) SysWrite(fd int, data syscallabi.ByteSliceView) (int, error) {
 			source = "stderr"
 		}
 
-		slog.Info(string(buf), "method", source, "from", l.machine.label)
+		l.simulation.rawLogger.Info(
+			string(buf), "method", source, "machine", l.machine.label, "goroutine", invocation.Goroutine, "step", gosimruntime.Step())
+
+		// slog.Info(string(buf), "method", source, "from", l.machine.label)
 		return data.Len(), nil
 	}
 
@@ -430,7 +437,7 @@ func (l *LinuxOS) SysWrite(fd int, data syscallabi.ByteSliceView) (int, error) {
 	}
 }
 
-func (l *LinuxOS) SysRead(fd int, data syscallabi.ByteSliceView) (int, error) {
+func (l *LinuxOS) SysRead(fd int, data syscallabi.ByteSliceView, invocation *syscallabi.Syscall) (int, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.shutdown {
@@ -480,7 +487,7 @@ func (l *LinuxOS) SysRead(fd int, data syscallabi.ByteSliceView) (int, error) {
 	}
 }
 
-func (l *LinuxOS) SysFallocate(fd int, mode uint32, off int64, len int64) (err error) {
+func (l *LinuxOS) SysFallocate(fd int, mode uint32, off int64, len int64, invocation *syscallabi.Syscall) (err error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.shutdown {
@@ -520,7 +527,7 @@ func (l *LinuxOS) SysFallocate(fd int, mode uint32, off int64, len int64) (err e
 	return nil
 }
 
-func (l *LinuxOS) SysLseek(fd int, offset int64, whence int) (off int64, err error) {
+func (l *LinuxOS) SysLseek(fd int, offset int64, whence int, invocation *syscallabi.Syscall) (off int64, err error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.shutdown {
@@ -565,7 +572,7 @@ func (l *LinuxOS) SysLseek(fd int, offset int64, whence int) (off int64, err err
 	return f.pos, nil
 }
 
-func (l *LinuxOS) SysPwrite64(fd int, data syscallabi.ByteSliceView, offset int64) (int, error) {
+func (l *LinuxOS) SysPwrite64(fd int, data syscallabi.ByteSliceView, offset int64, invocation *syscallabi.Syscall) (int, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.shutdown {
@@ -593,7 +600,7 @@ func (l *LinuxOS) SysPwrite64(fd int, data syscallabi.ByteSliceView, offset int6
 	return retn, nil
 }
 
-func (l *LinuxOS) SysPread64(fd int, data syscallabi.ByteSliceView, offset int64) (int, error) {
+func (l *LinuxOS) SysPread64(fd int, data syscallabi.ByteSliceView, offset int64, invocation *syscallabi.Syscall) (int, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.shutdown {
@@ -621,7 +628,7 @@ func (l *LinuxOS) SysPread64(fd int, data syscallabi.ByteSliceView, offset int64
 	return retn, nil
 }
 
-func (l *LinuxOS) SysFsync(fd int) error {
+func (l *LinuxOS) SysFsync(fd int, invocation *syscallabi.Syscall) error {
 	// XXX: janky way to crash on sync
 	l.machine.sometimesCrashOnSyncMu.Lock()
 	maybeCrash := l.machine.sometimesCrashOnSync
@@ -667,9 +674,9 @@ func (l *LinuxOS) SysFsync(fd int) error {
 	return nil
 }
 
-func (l *LinuxOS) SysFdatasync(fd int) error {
+func (l *LinuxOS) SysFdatasync(fd int, invocation *syscallabi.Syscall) error {
 	// TODO: sync only some subset instead?
-	return l.SysFsync(fd)
+	return l.SysFsync(fd, invocation)
 }
 
 func fillStat(view syscallabi.ValueView[syscall.Stat_t], in fs.StatResp) {
@@ -684,7 +691,7 @@ func fillStat(view syscallabi.ValueView[syscall.Stat_t], in fs.StatResp) {
 	view.Set(out)
 }
 
-func (l *LinuxOS) SysFstat(fd int, statBuf syscallabi.ValueView[syscall.Stat_t]) error {
+func (l *LinuxOS) SysFstat(fd int, statBuf syscallabi.ValueView[syscall.Stat_t], invocation *syscallabi.Syscall) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.shutdown {
@@ -718,7 +725,7 @@ func (l *LinuxOS) SysFstat(fd int, statBuf syscallabi.ValueView[syscall.Stat_t])
 }
 
 // arm64
-func (l *LinuxOS) SysFstatat(dirfd int, path string, statBuf syscallabi.ValueView[syscall.Stat_t], flags int) error {
+func (l *LinuxOS) SysFstatat(dirfd int, path string, statBuf syscallabi.ValueView[syscall.Stat_t], flags int, invocation *syscallabi.Syscall) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.shutdown {
@@ -750,11 +757,11 @@ func (l *LinuxOS) SysFstatat(dirfd int, path string, statBuf syscallabi.ValueVie
 }
 
 // amd64
-func (l *LinuxOS) SysNewfstatat(dirfd int, path string, statBuf syscallabi.ValueView[syscall.Stat_t], flags int) error {
-	return l.SysFstatat(dirfd, path, statBuf, flags)
+func (l *LinuxOS) SysNewfstatat(dirfd int, path string, statBuf syscallabi.ValueView[syscall.Stat_t], flags int, invocation *syscallabi.Syscall) error {
+	return l.SysFstatat(dirfd, path, statBuf, flags, invocation)
 }
 
-func (l *LinuxOS) SysUnlinkat(dirfd int, path string, flags int) error {
+func (l *LinuxOS) SysUnlinkat(dirfd int, path string, flags int, invocation *syscallabi.Syscall) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.shutdown {
@@ -784,7 +791,7 @@ func (l *LinuxOS) SysUnlinkat(dirfd int, path string, flags int) error {
 	}
 }
 
-func (l *LinuxOS) SysFtruncate(fd int, n int64) error {
+func (l *LinuxOS) SysFtruncate(fd int, n int64, invocation *syscallabi.Syscall) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.shutdown {
@@ -812,7 +819,7 @@ func (l *LinuxOS) SysFtruncate(fd int, n int64) error {
 	return nil
 }
 
-func (l *LinuxOS) SysClose(fd int) error {
+func (l *LinuxOS) SysClose(fd int, invocation *syscallabi.Syscall) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.shutdown {
@@ -846,7 +853,7 @@ func (l *LinuxOS) SysClose(fd int) error {
 	return nil
 }
 
-func (l *LinuxOS) SysSocket(net, flags, proto int) (int, error) {
+func (l *LinuxOS) SysSocket(net, flags, proto int, invocation *syscallabi.Syscall) (int, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.shutdown {
@@ -874,7 +881,7 @@ func (l *LinuxOS) SysSocket(net, flags, proto int) (int, error) {
 	return fd, nil
 }
 
-func (l *LinuxOS) SysBind(fd int, addrPtr unsafe.Pointer, addrlen Socklen) error {
+func (l *LinuxOS) SysBind(fd int, addrPtr unsafe.Pointer, addrlen Socklen, invocation *syscallabi.Syscall) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.shutdown {
@@ -913,7 +920,7 @@ func (l *LinuxOS) SysBind(fd int, addrPtr unsafe.Pointer, addrlen Socklen) error
 	return nil
 }
 
-func (l *LinuxOS) SysListen(fd, backlog int) error {
+func (l *LinuxOS) SysListen(fd, backlog int, invocation *syscallabi.Syscall) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.shutdown {
@@ -997,7 +1004,7 @@ func writeAddr(outbuf syscallabi.ValueView[RawSockaddrAny], outLen syscallabi.Va
 	}
 }
 
-func (l *LinuxOS) SysAccept4(fd int, rsa syscallabi.ValueView[RawSockaddrAny], len syscallabi.ValueView[Socklen], flags int) (int, error) {
+func (l *LinuxOS) SysAccept4(fd int, rsa syscallabi.ValueView[RawSockaddrAny], len syscallabi.ValueView[Socklen], flags int, invocation *syscallabi.Syscall) (int, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.shutdown {
@@ -1045,7 +1052,7 @@ func (l *LinuxOS) SysAccept4(fd int, rsa syscallabi.ValueView[RawSockaddrAny], l
 	return newFd, nil
 }
 
-func (l *LinuxOS) SysGetsockopt(fd int, level int, name int, ptr unsafe.Pointer, outlen syscallabi.ValueView[Socklen]) error {
+func (l *LinuxOS) SysGetsockopt(fd int, level int, name int, ptr unsafe.Pointer, outlen syscallabi.ValueView[Socklen], invocation *syscallabi.Syscall) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.shutdown {
@@ -1101,7 +1108,7 @@ func (l *LinuxOS) SysGetsockopt(fd int, level int, name int, ptr unsafe.Pointer,
 	}
 }
 
-func (l *LinuxOS) SysSetsockopt(s int, level int, name int, val unsafe.Pointer, vallen uintptr) (err error) {
+func (l *LinuxOS) SysSetsockopt(s int, level int, name int, val unsafe.Pointer, vallen uintptr, invocation *syscallabi.Syscall) (err error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.shutdown {
@@ -1112,7 +1119,7 @@ func (l *LinuxOS) SysSetsockopt(s int, level int, name int, val unsafe.Pointer, 
 	return nil
 }
 
-func (l *LinuxOS) SysGetsockname(fd int, rsa syscallabi.ValueView[RawSockaddrAny], len syscallabi.ValueView[Socklen]) error {
+func (l *LinuxOS) SysGetsockname(fd int, rsa syscallabi.ValueView[RawSockaddrAny], len syscallabi.ValueView[Socklen], invocation *syscallabi.Syscall) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.shutdown {
@@ -1149,7 +1156,7 @@ func (l *LinuxOS) SysGetsockname(fd int, rsa syscallabi.ValueView[RawSockaddrAny
 	}
 }
 
-func (l *LinuxOS) SysChdir(path string) (err error) {
+func (l *LinuxOS) SysChdir(path string, invocation *syscallabi.Syscall) (err error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.shutdown {
@@ -1167,7 +1174,7 @@ func (l *LinuxOS) SysChdir(path string) (err error) {
 	return nil
 }
 
-func (l *LinuxOS) SysGetcwd(buf syscallabi.SliceView[byte]) (n int, err error) {
+func (l *LinuxOS) SysGetcwd(buf syscallabi.SliceView[byte], invocation *syscallabi.Syscall) (n int, err error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.shutdown {
@@ -1192,7 +1199,7 @@ func (l *LinuxOS) SysGetcwd(buf syscallabi.SliceView[byte]) (n int, err error) {
 	return n, nil
 }
 
-func (l *LinuxOS) SysMkdirat(dirfd int, path string, mode uint32) (err error) {
+func (l *LinuxOS) SysMkdirat(dirfd int, path string, mode uint32, invocation *syscallabi.Syscall) (err error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.shutdown {
@@ -1209,7 +1216,7 @@ func (l *LinuxOS) SysMkdirat(dirfd int, path string, mode uint32) (err error) {
 	return l.machine.filesystem.Mkdir(dirInode, path)
 }
 
-func (l *LinuxOS) SysGetpeername(fd int, rsa syscallabi.ValueView[RawSockaddrAny], len syscallabi.ValueView[Socklen]) error {
+func (l *LinuxOS) SysGetpeername(fd int, rsa syscallabi.ValueView[RawSockaddrAny], len syscallabi.ValueView[Socklen], invocation *syscallabi.Syscall) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.shutdown {
@@ -1239,7 +1246,7 @@ func (l *LinuxOS) SysGetpeername(fd int, rsa syscallabi.ValueView[RawSockaddrAny
 	return nil
 }
 
-func (l *LinuxOS) SysFcntl(fd int, cmd int, arg int) (val int, err error) {
+func (l *LinuxOS) SysFcntl(fd int, cmd int, arg int, invocation *syscallabi.Syscall) (val int, err error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.shutdown {
@@ -1249,7 +1256,7 @@ func (l *LinuxOS) SysFcntl(fd int, cmd int, arg int) (val int, err error) {
 	return 0, syscall.ENOSYS
 }
 
-func (l *LinuxOS) SysFlock(fd int, how int) (err error) {
+func (l *LinuxOS) SysFlock(fd int, how int, invocation *syscallabi.Syscall) (err error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -1257,7 +1264,7 @@ func (l *LinuxOS) SysFlock(fd int, how int) (err error) {
 	return nil
 }
 
-func (l *LinuxOS) SysFcntlFlock(fd uintptr, cmd int, lk syscallabi.ValueView[Flock_t]) (err error) {
+func (l *LinuxOS) SysFcntlFlock(fd uintptr, cmd int, lk syscallabi.ValueView[Flock_t], invocation *syscallabi.Syscall) (err error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.shutdown {
@@ -1268,7 +1275,7 @@ func (l *LinuxOS) SysFcntlFlock(fd uintptr, cmd int, lk syscallabi.ValueView[Flo
 	return nil
 }
 
-func (l *LinuxOS) SysConnect(fd int, addrPtr unsafe.Pointer, addrLen Socklen) error {
+func (l *LinuxOS) SysConnect(fd int, addrPtr unsafe.Pointer, addrLen Socklen, invocation *syscallabi.Syscall) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.shutdown {
@@ -1310,7 +1317,7 @@ func (l *LinuxOS) SysConnect(fd int, addrPtr unsafe.Pointer, addrLen Socklen) er
 	return syscall.EINPROGRESS
 }
 
-func (l *LinuxOS) SysGetrandom(ptr syscallabi.ByteSliceView, flags int) (int, error) {
+func (l *LinuxOS) SysGetrandom(ptr syscallabi.ByteSliceView, flags int, invocation *syscallabi.Syscall) (int, error) {
 	// TODO: implement entirely in userspace?
 
 	l.mu.Lock()
@@ -1336,12 +1343,12 @@ func (l *LinuxOS) SysGetrandom(ptr syscallabi.ByteSliceView, flags int) (int, er
 	return n, nil
 }
 
-func (l *LinuxOS) SysGetpid() int {
+func (l *LinuxOS) SysGetpid(invocation *syscallabi.Syscall) int {
 	// TODO: return some random number instead?
 	return 42
 }
 
-func (l *LinuxOS) SysUname(buf syscallabi.ValueView[Utsname]) (err error) {
+func (l *LinuxOS) SysUname(buf syscallabi.ValueView[Utsname], invocation *syscallabi.Syscall) (err error) {
 	ptr := (*Utsname)(buf.UnsafePointer())
 	name := syscallabi.NewSliceView(&ptr.Nodename[0], uintptr(len(ptr.Nodename)))
 	var nameArray [65]int8
@@ -1354,13 +1361,13 @@ func (l *LinuxOS) SysUname(buf syscallabi.ValueView[Utsname]) (err error) {
 	return nil
 }
 
-func (l *LinuxOS) SysMadvise(b syscallabi.SliceView[byte], advice int) (err error) {
+func (l *LinuxOS) SysMadvise(b syscallabi.SliceView[byte], advice int, invocation *syscallabi.Syscall) (err error) {
 	logf("madvise %d %d %d", uintptr(unsafe.Pointer(unsafe.SliceData(b.Ptr))), b.Len(), advice)
 	// ignore? check args for some sanity?
 	return nil
 }
 
-func (l *LinuxOS) SysMmap(addr uintptr, length uintptr, prot int, flags int, fd int, offset int64) (xaddr uintptr, err error) {
+func (l *LinuxOS) SysMmap(addr uintptr, length uintptr, prot int, flags int, fd int, offset int64, invocation *syscallabi.Syscall) (xaddr uintptr, err error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.shutdown {
@@ -1398,7 +1405,7 @@ func (l *LinuxOS) SysMmap(addr uintptr, length uintptr, prot int, flags int, fd 
 	return xaddr, nil
 }
 
-func (l *LinuxOS) SysMunmap(addr uintptr, length uintptr) (err error) {
+func (l *LinuxOS) SysMunmap(addr uintptr, length uintptr, invocation *syscallabi.Syscall) (err error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.shutdown {

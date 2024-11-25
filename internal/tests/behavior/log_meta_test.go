@@ -74,10 +74,10 @@ func TestLogSLog(t *testing.T) {
 	}
 }
 
-func TestStdoutStderr(t *testing.T) {
+func TestLogStdoutStderr(t *testing.T) {
 	mt := metatesting.ForCurrentPackage(t)
 	run, err := mt.Run(t, &metatesting.RunConfig{
-		Test: "TestStdoutStderr",
+		Test: "TestLogStdoutStderr",
 		Seed: 1,
 	})
 	if err != nil {
@@ -85,8 +85,10 @@ func TestStdoutStderr(t *testing.T) {
 	}
 
 	actual := parseLog(t, run.LogOutput)
-	expected := parseLog(t, []byte(`{"time":"2020-01-15T14:10:03.000001234Z","level":"INFO","msg":"hello","machine":"os","method":"stdout","from":"main","goroutine":1,"step":1}
-{"time":"2020-01-15T14:10:03.000001234Z","level":"INFO","msg":"goodbye","machine":"os","method":"stderr","from":"main","goroutine":1,"step":2}
+	expected := parseLog(t, []byte(`{"time":"2020-01-15T14:10:03.000001234Z","level":"INFO","msg":"hello","machine":"main","method":"stdout","goroutine":4,"step":1}
+{"time":"2020-01-15T14:10:03.000001234Z","level":"INFO","msg":"goodbye","machine":"main","method":"stderr","goroutine":4,"step":2}
+{"time":"2020-01-15T14:10:03.000001234Z","level":"INFO","msg":"same goroutine log","machine":"main","goroutine":4,"step":3}
+{"time":"2020-01-15T14:10:03.000001234Z","level":"INFO","msg":"same goroutine slog","machine":"main","goroutine":4,"step":4}
 `))
 
 	if diff := cmp.Diff(expected, actual); diff != "" {
@@ -108,8 +110,10 @@ func TestLogDuringInit(t *testing.T) {
 	}
 
 	actual := parseLog(t, run.LogOutput)
-	expected := parseLog(t, []byte(`{"time":"2020-01-15T14:10:03.000001234Z","level":"INFO","msg":"hello\n","machine":"os","method":"stdout","from":"main","goroutine":1,"step":1}
-{"time":"2020-01-15T14:10:03.000001234Z","level":"INFO","msg":"2020/01/15 14:10:03 INFO help\n","machine":"os","method":"stderr","from":"main","goroutine":1,"step":2}
+	expected := parseLog(t, []byte(`{"time":"2020-01-15T14:10:03.000001234Z","level":"INFO","msg":"hello","machine":"main","method":"stdout","goroutine":3,"step":1}
+{"time":"2020-01-15T14:10:03.000001234Z","level":"INFO","msg":"2020/01/15 14:10:03 INFO help","machine":"main","method":"stderr","goroutine":3,"step":2}
+{"time":"2020-01-15T14:10:03.000001234Z","level":"INFO","msg":"hello","machine":"logm","method":"stdout","goroutine":5,"step":3}
+{"time":"2020-01-15T14:10:03.000001234Z","level":"INFO","msg":"2020/01/15 14:10:03 INFO help","machine":"logm","method":"stderr","goroutine":5,"step":4}
 `))
 
 	if diff := cmp.Diff(expected, actual); diff != "" {

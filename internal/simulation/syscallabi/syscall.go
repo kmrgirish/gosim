@@ -7,12 +7,19 @@ import (
 	"github.com/jellevandenhooff/gosim/internal/race"
 )
 
+// Marked go:norace so simulation can read Goroutine.
+//
+//go:norace
+func allocGoroutine(goroutineId int) unsafe.Pointer {
+	return unsafe.Pointer(&Syscall{
+		Goroutine: goroutineId,
+	})
+}
+
 // Setup configures the gosim runtime to allocate a Syscall struct
 // for each goroutine.
 func Setup() {
-	gosimruntime.SetSyscallAllocator(func() unsafe.Pointer {
-		return unsafe.Pointer(&Syscall{})
-	})
+	gosimruntime.SetSyscallAllocator(allocGoroutine)
 }
 
 // GetGoroutineLocalSyscall returns the per-goroutine pre-allocated
@@ -37,6 +44,8 @@ func GetGoroutineLocalSyscall() *Syscall {
 type Syscall struct {
 	Trampoline func(*Syscall)
 	OS         any
+
+	Goroutine int
 
 	Int0, Int1, Int2, Int3, Int4, Int5 uintptr
 	Ptr0, Ptr1, Ptr2, Ptr3, Ptr4       any

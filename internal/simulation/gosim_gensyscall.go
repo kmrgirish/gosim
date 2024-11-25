@@ -26,20 +26,20 @@ var (
 // with HandleSyscall. The interface is not used but helpful for implementing
 // new syscalls.
 type gosimOSIface interface {
-	MachineGetLabel(machineID int) (label string, err error)
-	MachineInodeInfo(machineID int, inodeID int, info syscallabi.ValueView[fs.InodeInfo])
-	MachineNew(label string, addr string, program any) (machineID int)
-	MachineRecoverInit(machineID int, program any) (iterID int)
-	MachineRecoverNext(iterID int) (machineID int, ok bool)
-	MachineRecoverRelease(iterID int)
-	MachineRestart(machineID int, partialDisk bool) (err error)
-	MachineSetBootProgram(machineID int, program any) (err error)
-	MachineSetSometimesCrashOnSync(machineID int, crash bool) (err error)
-	MachineStop(machineID int, graceful bool)
-	MachineWait(machineID int, syscall *syscallabi.Syscall)
-	SetConnected(a string, b string, connected bool) (err error)
-	SetDelay(a string, b string, delay time.Duration) (err error)
-	SetSimulationTimeout(timeout time.Duration) (err error)
+	MachineGetLabel(machineID int, invocation *syscallabi.Syscall) (label string, err error)
+	MachineInodeInfo(machineID int, inodeID int, info syscallabi.ValueView[fs.InodeInfo], invocation *syscallabi.Syscall)
+	MachineNew(label string, addr string, program any, invocation *syscallabi.Syscall) (machineID int)
+	MachineRecoverInit(machineID int, program any, invocation *syscallabi.Syscall) (iterID int)
+	MachineRecoverNext(iterID int, invocation *syscallabi.Syscall) (machineID int, ok bool)
+	MachineRecoverRelease(iterID int, invocation *syscallabi.Syscall)
+	MachineRestart(machineID int, partialDisk bool, invocation *syscallabi.Syscall) (err error)
+	MachineSetBootProgram(machineID int, program any, invocation *syscallabi.Syscall) (err error)
+	MachineSetSometimesCrashOnSync(machineID int, crash bool, invocation *syscallabi.Syscall) (err error)
+	MachineStop(machineID int, graceful bool, invocation *syscallabi.Syscall)
+	MachineWait(machineID int, invocation *syscallabi.Syscall)
+	SetConnected(a string, b string, connected bool, invocation *syscallabi.Syscall) (err error)
+	SetDelay(a string, b string, delay time.Duration, invocation *syscallabi.Syscall) (err error)
+	SetSimulationTimeout(timeout time.Duration, invocation *syscallabi.Syscall) (err error)
 }
 
 var _ gosimOSIface = &GosimOS{}
@@ -69,7 +69,7 @@ func SyscallMachineGetLabel(machineID int) (label string, err error) {
 //go:norace
 func trampolineMachineGetLabel(syscall *syscallabi.Syscall) {
 	machineID := int(syscall.Int0)
-	label, err := syscall.OS.(*GosimOS).MachineGetLabel(machineID)
+	label, err := syscall.OS.(*GosimOS).MachineGetLabel(machineID, syscall)
 	syscall.RPtr0 = label
 	syscall.Errno = syscallabi.ErrErrno(err)
 	syscall.Complete()
@@ -93,7 +93,7 @@ func trampolineMachineInodeInfo(syscall *syscallabi.Syscall) {
 	machineID := int(syscall.Int0)
 	inodeID := int(syscall.Int1)
 	info := syscallabi.NewValueView(syscall.Ptr2.(*fs.InodeInfo))
-	syscall.OS.(*GosimOS).MachineInodeInfo(machineID, inodeID, info)
+	syscall.OS.(*GosimOS).MachineInodeInfo(machineID, inodeID, info, syscall)
 	syscall.Complete()
 }
 
@@ -118,7 +118,7 @@ func trampolineMachineNew(syscall *syscallabi.Syscall) {
 	label := syscall.Ptr0.(string)
 	addr := syscall.Ptr1.(string)
 	program := syscall.Ptr2.(any)
-	machineID := syscall.OS.(*GosimOS).MachineNew(label, addr, program)
+	machineID := syscall.OS.(*GosimOS).MachineNew(label, addr, program, syscall)
 	syscall.R0 = uintptr(machineID)
 	syscall.Complete()
 }
@@ -140,7 +140,7 @@ func SyscallMachineRecoverInit(machineID int, program any) (iterID int) {
 func trampolineMachineRecoverInit(syscall *syscallabi.Syscall) {
 	machineID := int(syscall.Int0)
 	program := syscall.Ptr1.(any)
-	iterID := syscall.OS.(*GosimOS).MachineRecoverInit(machineID, program)
+	iterID := syscall.OS.(*GosimOS).MachineRecoverInit(machineID, program, syscall)
 	syscall.R0 = uintptr(iterID)
 	syscall.Complete()
 }
@@ -160,7 +160,7 @@ func SyscallMachineRecoverNext(iterID int) (machineID int, ok bool) {
 //go:norace
 func trampolineMachineRecoverNext(syscall *syscallabi.Syscall) {
 	iterID := int(syscall.Int0)
-	machineID, ok := syscall.OS.(*GosimOS).MachineRecoverNext(iterID)
+	machineID, ok := syscall.OS.(*GosimOS).MachineRecoverNext(iterID, syscall)
 	syscall.R0 = uintptr(machineID)
 	syscall.R1 = syscallabi.BoolToUintptr(ok)
 	syscall.Complete()
@@ -179,7 +179,7 @@ func SyscallMachineRecoverRelease(iterID int) {
 //go:norace
 func trampolineMachineRecoverRelease(syscall *syscallabi.Syscall) {
 	iterID := int(syscall.Int0)
-	syscall.OS.(*GosimOS).MachineRecoverRelease(iterID)
+	syscall.OS.(*GosimOS).MachineRecoverRelease(iterID, syscall)
 	syscall.Complete()
 }
 
@@ -199,7 +199,7 @@ func SyscallMachineRestart(machineID int, partialDisk bool) (err error) {
 func trampolineMachineRestart(syscall *syscallabi.Syscall) {
 	machineID := int(syscall.Int0)
 	partialDisk := syscallabi.BoolFromUintptr(syscall.Int1)
-	err := syscall.OS.(*GosimOS).MachineRestart(machineID, partialDisk)
+	err := syscall.OS.(*GosimOS).MachineRestart(machineID, partialDisk, syscall)
 	syscall.Errno = syscallabi.ErrErrno(err)
 	syscall.Complete()
 }
@@ -221,7 +221,7 @@ func SyscallMachineSetBootProgram(machineID int, program any) (err error) {
 func trampolineMachineSetBootProgram(syscall *syscallabi.Syscall) {
 	machineID := int(syscall.Int0)
 	program := syscall.Ptr1.(any)
-	err := syscall.OS.(*GosimOS).MachineSetBootProgram(machineID, program)
+	err := syscall.OS.(*GosimOS).MachineSetBootProgram(machineID, program, syscall)
 	syscall.Errno = syscallabi.ErrErrno(err)
 	syscall.Complete()
 }
@@ -242,7 +242,7 @@ func SyscallMachineSetSometimesCrashOnSync(machineID int, crash bool) (err error
 func trampolineMachineSetSometimesCrashOnSync(syscall *syscallabi.Syscall) {
 	machineID := int(syscall.Int0)
 	crash := syscallabi.BoolFromUintptr(syscall.Int1)
-	err := syscall.OS.(*GosimOS).MachineSetSometimesCrashOnSync(machineID, crash)
+	err := syscall.OS.(*GosimOS).MachineSetSometimesCrashOnSync(machineID, crash, syscall)
 	syscall.Errno = syscallabi.ErrErrno(err)
 	syscall.Complete()
 }
@@ -262,7 +262,7 @@ func SyscallMachineStop(machineID int, graceful bool) {
 func trampolineMachineStop(syscall *syscallabi.Syscall) {
 	machineID := int(syscall.Int0)
 	graceful := syscallabi.BoolFromUintptr(syscall.Int1)
-	syscall.OS.(*GosimOS).MachineStop(machineID, graceful)
+	syscall.OS.(*GosimOS).MachineStop(machineID, graceful, syscall)
 	syscall.Complete()
 }
 
@@ -302,7 +302,7 @@ func trampolineSetConnected(syscall *syscallabi.Syscall) {
 	a := syscall.Ptr0.(string)
 	b := syscall.Ptr1.(string)
 	connected := syscallabi.BoolFromUintptr(syscall.Int2)
-	err := syscall.OS.(*GosimOS).SetConnected(a, b, connected)
+	err := syscall.OS.(*GosimOS).SetConnected(a, b, connected, syscall)
 	syscall.Errno = syscallabi.ErrErrno(err)
 	syscall.Complete()
 }
@@ -327,7 +327,7 @@ func trampolineSetDelay(syscall *syscallabi.Syscall) {
 	a := syscall.Ptr0.(string)
 	b := syscall.Ptr1.(string)
 	delay := time.Duration(syscall.Int2)
-	err := syscall.OS.(*GosimOS).SetDelay(a, b, delay)
+	err := syscall.OS.(*GosimOS).SetDelay(a, b, delay, syscall)
 	syscall.Errno = syscallabi.ErrErrno(err)
 	syscall.Complete()
 }
@@ -346,7 +346,7 @@ func SyscallSetSimulationTimeout(timeout time.Duration) (err error) {
 //go:norace
 func trampolineSetSimulationTimeout(syscall *syscallabi.Syscall) {
 	timeout := time.Duration(syscall.Int0)
-	err := syscall.OS.(*GosimOS).SetSimulationTimeout(timeout)
+	err := syscall.OS.(*GosimOS).SetSimulationTimeout(timeout, syscall)
 	syscall.Errno = syscallabi.ErrErrno(err)
 	syscall.Complete()
 }

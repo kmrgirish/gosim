@@ -37,12 +37,12 @@ func NewGosimOS(s *Simulation, d syscallabi.Dispatcher) *GosimOS {
 	}
 }
 
-func (g *GosimOS) SetSimulationTimeout(d time.Duration) error {
+func (g *GosimOS) SetSimulationTimeout(d time.Duration, invocation *syscallabi.Syscall) error {
 	g.simulation.timeoutTimer.Reset(d)
 	return nil
 }
 
-func (g *GosimOS) MachineNew(label string, addrStr string, program any) (machineId int) {
+func (g *GosimOS) MachineNew(label string, addrStr string, program any, invocation *syscallabi.Syscall) (machineId int) {
 	g.simulation.mu.Lock()
 	defer g.simulation.mu.Unlock()
 
@@ -59,7 +59,7 @@ func (g *GosimOS) MachineNew(label string, addrStr string, program any) (machine
 	return machine.id
 }
 
-func (g *GosimOS) MachineRecoverInit(machineID int, program any) int {
+func (g *GosimOS) MachineRecoverInit(machineID int, program any, invocation *syscallabi.Syscall) int {
 	g.simulation.mu.Lock()
 	defer g.simulation.mu.Unlock()
 
@@ -93,7 +93,7 @@ func (g *GosimOS) MachineRecoverInit(machineID int, program any) int {
 	return id
 }
 
-func (g *GosimOS) MachineRecoverNext(crashIterId int) (int, bool) {
+func (g *GosimOS) MachineRecoverNext(crashIterId int, invocation *syscallabi.Syscall) (int, bool) {
 	g.simulation.mu.Lock()
 	defer g.simulation.mu.Unlock()
 
@@ -102,7 +102,7 @@ func (g *GosimOS) MachineRecoverNext(crashIterId int) (int, bool) {
 	return iter()
 }
 
-func (g *GosimOS) MachineRecoverRelease(crashIterId int) {
+func (g *GosimOS) MachineRecoverRelease(crashIterId int, invocation *syscallabi.Syscall) {
 	g.simulation.mu.Lock()
 	defer g.simulation.mu.Unlock()
 
@@ -110,7 +110,7 @@ func (g *GosimOS) MachineRecoverRelease(crashIterId int) {
 	delete(g.crashItersById, crashIterId)
 }
 
-func (g *GosimOS) MachineInodeInfo(machineID int, inode int, info syscallabi.ValueView[fs.InodeInfo]) {
+func (g *GosimOS) MachineInodeInfo(machineID int, inode int, info syscallabi.ValueView[fs.InodeInfo], invocation *syscallabi.Syscall) {
 	g.simulation.mu.Lock()
 	defer g.simulation.mu.Unlock()
 
@@ -118,20 +118,20 @@ func (g *GosimOS) MachineInodeInfo(machineID int, inode int, info syscallabi.Val
 	info.Set(machine.filesystem.GetInodeInfo(inode))
 }
 
-func (g *GosimOS) MachineWait(machineID int, syscall *syscallabi.Syscall) {
+func (g *GosimOS) MachineWait(machineID int, invocation *syscallabi.Syscall) {
 	g.simulation.mu.Lock()
 	defer g.simulation.mu.Unlock()
 
 	machine := g.simulation.machinesById[machineID]
 	if machine.runtimeMachine == nil {
 		// XXX: improve how we mark stopped please
-		syscall.Complete()
+		invocation.Complete()
 	} else {
-		machine.waiters = append(machine.waiters, syscall)
+		machine.waiters = append(machine.waiters, invocation)
 	}
 }
 
-func (g *GosimOS) MachineStop(machineID int, graceful bool) {
+func (g *GosimOS) MachineStop(machineID int, graceful bool, invocation *syscallabi.Syscall) {
 	g.simulation.mu.Lock()
 	defer g.simulation.mu.Unlock()
 
@@ -139,7 +139,7 @@ func (g *GosimOS) MachineStop(machineID int, graceful bool) {
 	g.simulation.stopMachine(machine, graceful)
 }
 
-func (g *GosimOS) MachineRestart(machineID int, partialDisk bool) (err error) {
+func (g *GosimOS) MachineRestart(machineID int, partialDisk bool, invocation *syscallabi.Syscall) (err error) {
 	g.simulation.mu.Lock()
 	defer g.simulation.mu.Unlock()
 
@@ -158,7 +158,7 @@ func (g *GosimOS) MachineRestart(machineID int, partialDisk bool) (err error) {
 	return nil
 }
 
-func (g *GosimOS) MachineGetLabel(machineID int) (label string, err error) {
+func (g *GosimOS) MachineGetLabel(machineID int, invocation *syscallabi.Syscall) (label string, err error) {
 	g.simulation.mu.Lock()
 	defer g.simulation.mu.Unlock()
 
@@ -167,7 +167,7 @@ func (g *GosimOS) MachineGetLabel(machineID int) (label string, err error) {
 	return machine.label, nil
 }
 
-func (g *GosimOS) MachineSetBootProgram(machineID int, program any) (err error) {
+func (g *GosimOS) MachineSetBootProgram(machineID int, program any, invocation *syscallabi.Syscall) (err error) {
 	g.simulation.mu.Lock()
 	defer g.simulation.mu.Unlock()
 
@@ -177,7 +177,7 @@ func (g *GosimOS) MachineSetBootProgram(machineID int, program any) (err error) 
 	return nil
 }
 
-func (g *GosimOS) MachineSetSometimesCrashOnSync(machineID int, value bool) (err error) {
+func (g *GosimOS) MachineSetSometimesCrashOnSync(machineID int, value bool, invocation *syscallabi.Syscall) (err error) {
 	g.simulation.mu.Lock()
 	defer g.simulation.mu.Unlock()
 
@@ -195,12 +195,12 @@ func mustHostPair(a, b string) network.HostPair {
 	}
 }
 
-func (g *GosimOS) SetConnected(a, b string, connected bool) error {
+func (g *GosimOS) SetConnected(a, b string, connected bool, invocation *syscallabi.Syscall) error {
 	g.simulation.network.SetConnected(mustHostPair(a, b), connected)
 	return nil
 }
 
-func (g *GosimOS) SetDelay(a, b string, delay time.Duration) error {
+func (g *GosimOS) SetDelay(a, b string, delay time.Duration, invocation *syscallabi.Syscall) error {
 	g.simulation.network.SetDelay(mustHostPair(a, b), delay)
 	return nil
 }

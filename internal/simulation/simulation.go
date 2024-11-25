@@ -46,6 +46,9 @@ type Simulation struct {
 	network *network.Network
 
 	timeoutTimer *time.Timer
+
+	// rawLogger does not include goroutine or machine
+	rawLogger *slog.Logger
 }
 
 func (s *Simulation) newMachine(label string, addr netip.Addr, filesystem *fs.Filesystem, bootProgram func()) *Machine {
@@ -169,6 +172,8 @@ func Runtime(fun func()) {
 		network: network.NewNetwork(),
 
 		timeoutTimer: timeoutTimer,
+
+		rawLogger: slog.New(makeBaseSlogHandler()),
 	}
 	go s.network.Run()
 

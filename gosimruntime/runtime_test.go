@@ -37,7 +37,7 @@ func expectNumGoroutines(t *testing.T, situation string) {
 }
 
 func init() {
-	SetSyscallAllocator(func() unsafe.Pointer {
+	SetSyscallAllocator(func(goroutineId int) unsafe.Pointer {
 		return nil
 	})
 	initializeRuntime(func(f func()) {

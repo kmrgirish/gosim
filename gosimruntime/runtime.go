@@ -498,7 +498,7 @@ func newGoroutine(id int, parent *goroutine, spawnEventID int, fun func(), machi
 	gs := gs.get()
 
 	g := allocGoroutine()
-	g.syscallCache = syscallAllocator() //  &Syscall{} // XXX: doing this rn because of reused sema
+	g.syscallCache = syscallAllocator(id) //  &Syscall{} // XXX: doing this rn because of reused sema
 	g.ID = id
 	g.parent = parent
 	g.spawnEventID = spawnEventID
@@ -792,9 +792,9 @@ func (g *goroutine) wait() {
 	g.park(true)
 }
 
-var syscallAllocator func() unsafe.Pointer
+var syscallAllocator func(goroutineId int) unsafe.Pointer
 
-func SetSyscallAllocator(f func() unsafe.Pointer) {
+func SetSyscallAllocator(f func(goroutineId int) unsafe.Pointer) {
 	syscallAllocator = f
 }
 
