@@ -30,19 +30,38 @@ type ChanType struct {
 	Named types.Type
 }
 
+func isTypChanType(typ types.Type) (ChanType, bool) {
+	if chanTyp, ok := typ.Underlying().(*types.Chan); ok {
+		return ChanType{Type: chanTyp, Named: typ}, true
+	}
+
+	if param, ok := typ.(*types.TypeParam); ok {
+		iface := param.Constraint().Underlying().(*types.Interface)
+		if iface.NumEmbeddeds() == 1 {
+			if union, ok := iface.EmbeddedType(0).(*types.Union); ok {
+				if union.Len() == 1 {
+					if chanType, ok := union.Term(0).Type().(*types.Chan); ok {
+						return ChanType{Type: chanType, Named: typ}, true
+					}
+				}
+			}
+		}
+	}
+
+	return ChanType{}, false
+}
+
 func (t *packageTranslator) isChanType(expr dst.Expr) (ChanType, bool) {
 	if astExpr, ok := t.astMap.Nodes[expr].(ast.Expr); ok {
 		if convertedType, ok := t.implicitConversions[astExpr]; ok {
-			if chanType, ok := convertedType.Underlying().(*types.Chan); ok {
-				return ChanType{Type: chanType, Named: convertedType}, true
+			if typ, ok := isTypChanType(convertedType); ok {
+				return typ, ok
 			}
 		}
 	}
 
 	if typ, ok := t.getType(expr); ok {
-		if chanTyp, ok := typ.Underlying().(*types.Chan); ok {
-			return ChanType{Type: chanTyp, Named: typ}, true
-		}
+		return isTypChanType(typ)
 	}
 
 	return ChanType{}, false
@@ -143,9 +162,10 @@ func (t *packageTranslator) rewriteChanRecvOk(c *dstutil.Cursor) {
 	}
 
 	if recvExpr, ok := isRecvExpr(*rhs); ok {
+		typ, _ := t.isChanType(recvExpr.X)
 		*rhs = &dst.CallExpr{
 			Fun: &dst.SelectorExpr{
-				X:   recvExpr.X,
+				X:   t.maybeExtractNamedChanType(recvExpr.X, typ),
 				Sel: dst.NewIdent("RecvOk"),
 			},
 		}
@@ -189,14 +209,24 @@ func (t *packageTranslator) rewriteChanSend(c *dstutil.Cursor) {
 func (t *packageTranslator) rewriteChanLiteral(c *dstutil.Cursor) {
 	if ident, ok := c.Node().(*dst.Ident); ok && ident.Name == "nil" {
 		if chanType, ok := t.isChanType(ident); ok {
-			c.Replace(&dst.CallExpr{
+			c.Replace(t.maybeConvertChanType(&dst.CallExpr{
 				Fun: &dst.IndexListExpr{
 					X: t.newRuntimeSelector("NilChan"),
 					Indices: []dst.Expr{
 						t.makeTypeExpr(chanType.Type.Elem()),
 					},
 				},
-			})
+			}, chanType))
+		}
+	} else if expr, ok := c.Node().(dst.Expr); ok {
+		astExpr, _ := t.astMap.Nodes[expr].(ast.Expr)
+		if typ, ok := t.implicitConversions[astExpr]; ok {
+			if _, ok := isTypChanType(typ); ok {
+				c.Replace(&dst.CallExpr{
+					Fun:  t.makeTypeExpr(typ),
+					Args: []dst.Expr{expr},
+				})
+			}
 		}
 	}
 }
@@ -255,8 +285,9 @@ func (t *packageTranslator) rewriteSelectStmt(c *dstutil.Cursor) {
 			var handler dst.Expr
 
 			if sendStmt, ok := clause.Comm.(*dst.SendStmt); ok {
+				typ, _ := t.isChanType(sendStmt.Chan)
 				handler = &dst.CallExpr{
-					Fun:  &dst.SelectorExpr{X: sendStmt.Chan, Sel: dst.NewIdent("SendSelector")},
+					Fun:  &dst.SelectorExpr{X: t.maybeExtractNamedChanType(sendStmt.Chan, typ), Sel: dst.NewIdent("SendSelector")},
 					Args: []dst.Expr{sendStmt.Value},
 				}
 			} else if exprStmt, ok := clause.Comm.(*dst.ExprStmt); ok {
@@ -310,7 +341,7 @@ func (t *packageTranslator) rewriteSelectStmt(c *dstutil.Cursor) {
 				}, clause.Body...)
 
 				handler = &dst.CallExpr{
-					Fun: &dst.SelectorExpr{X: recvExpr.X, Sel: dst.NewIdent("RecvSelector")},
+					Fun: &dst.SelectorExpr{X: t.maybeExtractNamedChanType(recvExpr.X, typ), Sel: dst.NewIdent("RecvSelector")},
 				}
 			} else if clause.Comm == nil {
 				hasDefault = true

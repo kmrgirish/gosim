@@ -167,12 +167,6 @@ func (t *packageTranslator) makeTypeExpr(typ types.Type) dst.Expr {
 		}
 
 	case *types.Struct:
-		/*
-			if typ.NumFields() != 0 {
-				panic(typ)
-			}
-		*/
-		// XXX: jank return empty structs for lols
 		if typ.NumFields() == 0 {
 			return &dst.StructType{
 				Fields: &dst.FieldList{
@@ -189,10 +183,14 @@ func (t *packageTranslator) makeTypeExpr(typ types.Type) dst.Expr {
 			if !field.Anonymous() {
 				names = []*dst.Ident{dst.NewIdent(field.Name())}
 			}
+			var tag *dst.BasicLit
+			if tagValue := typ.Tag(i); tagValue != "" {
+				tag = &dst.BasicLit{Kind: token.STRING, Value: strconv.Quote(typ.Tag(i))}
+			}
 			fields = append(fields, &dst.Field{
 				Names: names,
 				Type:  t.makeTypeExpr(field.Type()),
-				Tag:   &dst.BasicLit{Kind: token.STRING, Value: strconv.Quote(typ.Tag(i))}, // XXX: wrong?
+				Tag:   tag,
 			})
 		}
 		return &dst.StructType{
@@ -201,19 +199,10 @@ func (t *packageTranslator) makeTypeExpr(typ types.Type) dst.Expr {
 			},
 		}
 	case *types.Signature:
-		/*
-			// XXX: skip; this lets us output interfaces hopefully
-			if typ.Recv() != nil {
-				panic(typ)
-			}
-		*/
 		if typ.RecvTypeParams() != nil {
 			panic(typ)
 		}
 		if typ.TypeParams() != nil {
-			panic(typ)
-		}
-		if typ.Variadic() {
 			panic(typ)
 		}
 
@@ -221,10 +210,15 @@ func (t *packageTranslator) makeTypeExpr(typ types.Type) dst.Expr {
 
 		for i := 0; i < typ.Params().Len(); i++ {
 			param := typ.Params().At(i)
-
+			paramType := t.makeTypeExpr(param.Type())
+			if typ.Variadic() && i == typ.Params().Len()-1 {
+				paramType = &dst.Ellipsis{
+					Elt: paramType.(*dst.ArrayType).Elt, // the signature for ... has an array type?
+				}
+			}
 			params = append(params, &dst.Field{
 				Names: []*dst.Ident{dst.NewIdent(param.Name())},
-				Type:  t.makeTypeExpr(param.Type()),
+				Type:  paramType,
 			})
 		}
 
@@ -345,6 +339,25 @@ func (b *implicitConversionsBuilder) before(c *astutil.Cursor) bool {
 			break
 		}
 
+		if mp, ok := b.typesInfo.Types[node].Type.Underlying().(*types.Map); ok {
+			for _, elt := range node.Elts {
+				if node, ok := elt.(*ast.KeyValueExpr); ok {
+					x := mp.Elem()
+					y := b.typesInfo.Types[node.Value]
+					if !types.Identical(y.Type, x) {
+						b.conversions[node.Value] = x
+					}
+
+					x = mp.Key()
+					y = b.typesInfo.Types[node.Key]
+					if !types.Identical(y.Type, x) {
+						b.conversions[node.Key] = x
+					}
+				}
+			}
+			break
+		}
+
 		var elem types.Type
 		if arr, ok := b.typesInfo.Types[node].Type.Underlying().(*types.Array); ok {
 			elem = arr.Elem()
@@ -406,6 +419,7 @@ func (b *implicitConversionsBuilder) before(c *astutil.Cursor) bool {
 		} else {
 			// XXX?
 		}
+
 	case *ast.AssignStmt:
 		// xxx: this can happen if we have a call
 		if len(node.Lhs) != len(node.Rhs) {
@@ -423,6 +437,20 @@ func (b *implicitConversionsBuilder) before(c *astutil.Cursor) bool {
 					panic("help")
 				}
 				b.conversions[node.Rhs[i]] = x.Type
+			}
+		}
+
+	case *ast.SendStmt:
+		// xxx: this can happen if we have a call
+
+		chType := b.typesInfo.Types[node.Chan]
+
+		if chType, ok := chType.Type.Underlying().(*types.Chan); ok {
+			x := chType.Elem()
+			y := b.typesInfo.Types[node.Value].Type
+
+			if !types.Identical(x, y) {
+				b.conversions[node.Value] = x
 			}
 		}
 

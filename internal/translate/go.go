@@ -16,21 +16,20 @@ func (t *packageTranslator) rewriteGo(c *dstutil.Cursor) {
 		var fun dst.Expr
 
 		funcType, ok := t.getType(goStmt.Call.Fun)
-		simple := ok && funcType.(*types.Signature).Params().Len() == 0 && funcType.(*types.Signature).Results().Len() == 0
+		if !ok {
+			panic("help")
+		}
+
+		simple := funcType.(*types.Signature).Params().Len() == 0 && funcType.(*types.Signature).Results().Len() == 0
 
 		if simple {
 			// go func() { ... } ()
-			fun = goStmt.Call.Fun
+			fun = t.apply(goStmt.Call.Fun).(dst.Expr)
 		} else {
-			args := 0
-			variable := false
-			ret := 0
-			if ok {
-				sig := funcType.(*types.Signature)
-				args = sig.Params().Len()
-				variable = sig.Variadic()
-				ret = sig.Results().Len()
-			}
+			sig := funcType.(*types.Signature)
+			args := sig.Params().Len()
+			variable := sig.Variadic()
+			ret := sig.Results().Len()
 
 			bs := bindspec{args: args, variable: variable, ret: ret}
 			t.collect.bindspecs[bs] = struct{}{}
@@ -40,7 +39,7 @@ func (t *packageTranslator) rewriteGo(c *dstutil.Cursor) {
 					Fun: &dst.Ident{
 						Name: bs.Name(),
 					},
-					Args: []dst.Expr{goStmt.Call.Fun},
+					Args: []dst.Expr{t.apply(goStmt.Call.Fun).(dst.Expr)},
 				},
 				Args: goStmt.Call.Args,
 			}

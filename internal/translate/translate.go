@@ -536,12 +536,12 @@ func (t *packageTranslator) preApply(c *dstutil.Cursor) bool {
 	t.rewriteChanLen(c)
 	t.rewriteChanCap(c)
 	t.rewriteGlobalDef(c)
-	t.rewriteGlobalRead(c) // XXX: after rewriteIdent
 	t.rewriteInit(c)
 	t.markSyncFuncsNorace(c)
 	t.rewriteStdlibEmptyAndLinkname(c)
-
 	t.rewriteDanglingLinknames(c)
+	t.rewriteGo(c)
+	t.rewriteGlobalRead(c) // XXX: after rewriteGO?? think abou
 
 	return true
 }
@@ -552,8 +552,6 @@ func (t *packageTranslator) postApply(c *dstutil.Cursor) bool {
 	t.rewriteChanRange(c)
 	t.rewriteChanClose(c)
 	t.rewriteChanSend(c)
-
-	t.rewriteGo(c)
 
 	return true
 }
