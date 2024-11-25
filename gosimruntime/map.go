@@ -57,6 +57,9 @@ func NilMap[K comparable, V any]() Map[K, V] {
 }
 
 // ExtractMap extracts a Map from named Map types.
+//
+// TODO: Consider instead having many generic package-local funcs for MapRange,
+// MapSet, etc.? That would sidestep all the ExtractMap calls.
 func ExtractMap[M ~struct{ Impl *mapImpl[K, V] }, K comparable, V any](m M) Map[K, V] {
 	return Map[K, V](m)
 }
