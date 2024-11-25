@@ -118,7 +118,7 @@ func (t *packageTranslator) rewriteChanType(c *dstutil.Cursor) {
 		c.Replace(&dst.IndexListExpr{
 			X: t.newRuntimeSelector("Chan"),
 			Indices: []dst.Expr{
-				chanType.Value, // XXX: apply?
+				t.apply(chanType.Value).(dst.Expr),
 			},
 		})
 	}
@@ -129,7 +129,7 @@ func (t *packageTranslator) rewriteChanRange(c *dstutil.Cursor) {
 		if typ, ok := t.isChanType(rangeStmt.X); ok {
 			rangeStmt.X = &dst.CallExpr{
 				Fun: &dst.SelectorExpr{
-					X:   t.maybeExtractNamedChanType(rangeStmt.X, typ),
+					X:   t.maybeExtractNamedChanType(t.apply(rangeStmt.X).(dst.Expr), typ),
 					Sel: dst.NewIdent("Range"),
 				},
 			}
@@ -146,7 +146,7 @@ func (t *packageTranslator) rewriteChanRecvSimpleExpr(c *dstutil.Cursor) {
 
 		c.Replace(&dst.CallExpr{
 			Fun: &dst.SelectorExpr{
-				X:   t.maybeExtractNamedChanType(recvExpr.X, typ),
+				X:   t.maybeExtractNamedChanType(t.apply(recvExpr.X).(dst.Expr), typ),
 				Sel: dst.NewIdent("Recv"),
 			},
 		})
@@ -165,7 +165,7 @@ func (t *packageTranslator) rewriteChanRecvOk(c *dstutil.Cursor) {
 		typ, _ := t.isChanType(recvExpr.X)
 		*rhs = &dst.CallExpr{
 			Fun: &dst.SelectorExpr{
-				X:   t.maybeExtractNamedChanType(recvExpr.X, typ),
+				X:   t.maybeExtractNamedChanType(t.apply(recvExpr.X).(dst.Expr), typ),
 				Sel: dst.NewIdent("RecvOk"),
 			},
 		}
@@ -179,7 +179,7 @@ func (t *packageTranslator) rewriteChanClose(c *dstutil.Cursor) {
 		r := &dst.CallExpr{
 			Decs: callExpr.Decs,
 			Fun: &dst.SelectorExpr{
-				X:   t.maybeExtractNamedChanType(callExpr.Args[0], typ),
+				X:   t.maybeExtractNamedChanType(t.apply(callExpr.Args[0]).(dst.Expr), typ),
 				Sel: dst.NewIdent("Close"),
 			},
 		}
@@ -195,11 +195,11 @@ func (t *packageTranslator) rewriteChanSend(c *dstutil.Cursor) {
 		c.Replace(&dst.ExprStmt{
 			X: &dst.CallExpr{
 				Fun: &dst.SelectorExpr{
-					X:   t.maybeExtractNamedChanType(sendStmt.Chan, typ),
+					X:   t.maybeExtractNamedChanType(t.apply(sendStmt.Chan).(dst.Expr), typ),
 					Sel: dst.NewIdent("Send"),
 				},
 				Args: []dst.Expr{
-					sendStmt.Value,
+					t.apply(sendStmt.Value).(dst.Expr),
 				},
 			},
 		})

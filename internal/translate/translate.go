@@ -510,7 +510,7 @@ func (t *packageTranslator) newRuntimeSelector(name string) *dst.Ident {
 }
 
 func (t *packageTranslator) apply(node dst.Node) dst.Node {
-	return dstutil.Apply(node, t.preApply, t.postApply)
+	return dstutil.Apply(node, t.preApply, nil)
 }
 
 func (t *packageTranslator) preApply(c *dstutil.Cursor) bool {
@@ -531,6 +531,8 @@ func (t *packageTranslator) preApply(c *dstutil.Cursor) bool {
 	t.rewriteNotifyListHack(c)
 	t.rewriteJsonGlobalsHack(c)
 
+	// TODO: think about and make this ordering less brittle
+
 	t.rewriteMapGetOk(c)
 	t.rewriteChanRecvOk(c)
 	t.rewriteMapLiteral(c)
@@ -545,6 +547,11 @@ func (t *packageTranslator) preApply(c *dstutil.Cursor) bool {
 	t.rewriteMapType(c)
 	t.rewriteChanLen(c)
 	t.rewriteChanCap(c)
+	t.rewriteChanType(c)
+	t.rewriteChanRecvSimpleExpr(c)
+	t.rewriteChanRange(c)
+	t.rewriteChanClose(c)
+	t.rewriteChanSend(c)
 	t.rewriteGlobalDef(c)
 	t.rewriteInit(c)
 	t.markSyncFuncsNorace(c)
@@ -552,16 +559,6 @@ func (t *packageTranslator) preApply(c *dstutil.Cursor) bool {
 	t.rewriteDanglingLinknames(c)
 	t.rewriteGo(c)
 	t.rewriteGlobalRead(c) // XXX: after rewriteGO?? think abou
-
-	return true
-}
-
-func (t *packageTranslator) postApply(c *dstutil.Cursor) bool {
-	t.rewriteChanType(c)
-	t.rewriteChanRecvSimpleExpr(c)
-	t.rewriteChanRange(c)
-	t.rewriteChanClose(c)
-	t.rewriteChanSend(c)
 
 	return true
 }
