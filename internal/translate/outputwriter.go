@@ -42,7 +42,7 @@ func newJankyGuessResolver(known map[string]string) resolver.RestorerResolver {
 	}
 }
 
-func dstFileToAstFile(f *dst.File, path string, known map[string]string) (*ast.File, *token.FileSet, error) {
+func dstFileToAstFile(f *dst.File, path string, known, aliases map[string]string) (*ast.File, *token.FileSet, error) {
 	res := decorator.NewRestorer()
 	res.Resolver = newJankyGuessResolver(known)
 	res.Path = path
@@ -53,6 +53,10 @@ func dstFileToAstFile(f *dst.File, path string, known map[string]string) (*ast.F
 	// lifted from res.RestoreFile but modified so we can have the alias
 	restorer := res.FileRestorer()
 	restorer.Alias["testing"] = "testing_original"
+	for path, alias := range aliases {
+		restorer.Alias[path] = alias
+	}
+
 	af, err := restorer.RestoreFile(f)
 	if err != nil {
 		return nil, nil, err
@@ -90,8 +94,8 @@ func dstFileToAstFile(f *dst.File, path string, known map[string]string) (*ast.F
 	return af, res.Fset, nil
 }
 
-func dstFileToBytes(f *dst.File, known map[string]string, path string) ([]byte, error) {
-	af, fset, err := dstFileToAstFile(f, path, known)
+func dstFileToBytes(f *dst.File, known, aliases map[string]string, path string) ([]byte, error) {
+	af, fset, err := dstFileToAstFile(f, path, known, aliases)
 	if err != nil {
 		return nil, err
 	}

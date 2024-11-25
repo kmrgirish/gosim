@@ -161,7 +161,7 @@ func translatePackage(args *translatePackageArgs) *TranslatePackageResult {
 		if err != nil {
 			log.Fatal(err)
 		}
-		bytes, err := dstFileToBytes(file, args.packageNames, args.replacedPkgs[extractedPath]+"_test")
+		bytes, err := dstFileToBytes(file, args.packageNames, nil, args.replacedPkgs[extractedPath]+"_test")
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -206,6 +206,8 @@ func translatePackage(args *translatePackageArgs) *TranslatePackageResult {
 	var dstFiles []*dst.File
 	dstFilePaths := make(map[*dst.File]string)
 
+	collectedAliases := make(map[string]string)
+
 	// translate package files
 	for _, file := range pkgFiles {
 		filePath := args.pkg.Fset.File(file.Package).Name()
@@ -215,6 +217,14 @@ func translatePackage(args *translatePackageArgs) *TranslatePackageResult {
 		}
 		dstFiles = append(dstFiles, dstFile)
 		dstFilePaths[dstFile] = filePath
+
+		for _, imp := range dstFile.Imports {
+			if imp.Name != nil && imp.Name.Name != "_" && imp.Name.Name != "." {
+				if p, err := strconv.Unquote(imp.Path.Value); err == nil {
+					collectedAliases[args.replacedPkgs[p]] = imp.Name.Name
+				}
+			}
+		}
 	}
 
 	testFuncs := make(map[string]bool)
@@ -325,7 +335,7 @@ func translatePackage(args *translatePackageArgs) *TranslatePackageResult {
 		if err != nil {
 			log.Fatal("translate", filePath, err)
 		}
-		bytes, err := dstFileToBytes(file, args.packageNames, "main")
+		bytes, err := dstFileToBytes(file, args.packageNames, nil, "main")
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -345,7 +355,7 @@ func translatePackage(args *translatePackageArgs) *TranslatePackageResult {
 			if err != nil {
 				log.Fatal(err)
 			}
-			bytes, err := dstFileToBytes(file, args.packageNames, "main")
+			bytes, err := dstFileToBytes(file, args.packageNames, collectedAliases, "main")
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -380,7 +390,7 @@ func translatePackage(args *translatePackageArgs) *TranslatePackageResult {
 			if err != nil {
 				log.Fatal(err)
 			}
-			bytes, err := dstFileToBytes(file, args.packageNames, "main")
+			bytes, err := dstFileToBytes(file, args.packageNames, collectedAliases, "main")
 			if err != nil {
 				log.Fatal(err)
 			}
