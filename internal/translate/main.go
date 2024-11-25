@@ -79,8 +79,9 @@ var keepAsmPackagesGo123 = map[string]bool{
 }
 
 var PublicExportHacks = map[string][]string{
-	"encoding/binary": {"littleEndian"},
-	"internal/poll":   {"errNetClosing"},
+	"encoding/binary":                  {"littleEndian"},
+	"internal/poll":                    {"errNetClosing"},
+	"github.com/golang/protobuf/proto": {"enumsByName"},
 }
 
 // XXX: replace the package instead
