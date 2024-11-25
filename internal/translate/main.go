@@ -6,15 +6,16 @@ import (
 	"flag"
 	"go/token"
 	"log"
-	"maps"
 	"os"
 	"path"
 	"runtime/pprof"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/mod/modfile"
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/jellevandenhooff/gosim/internal/gosimtool"
@@ -116,10 +117,10 @@ const (
 		packages.NeedTypesInfo | packages.NeedFiles | packages.NeedImports
 )
 
-func loadPackages(patterns []string, b gosimtool.BuildConfig, mode packages.LoadMode) ([]*packages.Package, error) {
+func loadPackages(patterns []string, b gosimtool.BuildConfig, mode packages.LoadMode, tests bool) ([]*packages.Package, error) {
 	cfg := &packages.Config{
 		Mode:  mode,
-		Tests: true,
+		Tests: tests,
 		Fset:  token.NewFileSet(),
 	}
 
@@ -157,6 +158,66 @@ func loadPackages(patterns []string, b gosimtool.BuildConfig, mode packages.Load
 	}
 
 	return packages, nil
+}
+
+// reloadUncachedPackages loads the types and AST for the given uncached package
+// paths. It takes special care to load tests only where appropriate, because
+// broken tests in dependencies are not uncommon.
+//
+// loadPackages has a binary flag for loading tests, which if enabled loads
+// tests for the explicitly listed packages. It does not load tests for
+// dependencies.
+//
+// When we reload packages here we explicitly list all packages we want to load,
+// including dependencies whose tests we do not care about. To not load tests
+// for those we make to calls to loadPackages, one with and one without tests.
+func reloadUncachedPackages(listedPkgs []*packages.Package, uncachedPackages map[string]struct{}, cfg gosimtool.BuildConfig) map[string]*packages.Package {
+	// determine packages we want to load tests for based on
+	// the original command line arguments
+	listedPkgPaths := make(map[string]struct{})
+	for _, pkg := range listedPkgs {
+		if fromGosim := slices.Contains(TranslatedRuntimePackages, pkg.PkgPath); fromGosim {
+			continue
+		}
+		listedPkgPaths[pkg.PkgPath] = struct{}{}
+	}
+
+	// reloadByTests is packages to reload, with tests enabled or not
+	reloadByTests := make(map[bool][]string)
+	for path := range uncachedPackages {
+		_, ok := listedPkgPaths[path]
+		reloadByTests[ok] = append(reloadByTests[ok], path)
+	}
+
+	// reload packages in parallel
+	var mu sync.Mutex
+	reloadedByTests := make(map[bool][]*packages.Package)
+	var g errgroup.Group
+	for test, pkgs := range reloadByTests {
+		g.Go(func() error {
+			reloaded, err := loadPackages(pkgs, cfg, loadSyntaxAndTypes, test)
+			if err != nil {
+				return err
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			reloadedByTests[test] = reloaded
+			return nil
+		})
+	}
+	if err := g.Wait(); err != nil {
+		log.Fatal(err)
+	}
+
+	// merge results
+	pkgsWithTypesAndAst := make(map[string]*packages.Package)
+	for _, pkgs := range reloadedByTests {
+		for _, pkg := range pkgs {
+			pkgsWithTypesAndAst[pkg.ID] = pkg
+		}
+	}
+
+	return pkgsWithTypesAndAst
 }
 
 type packageKind string
@@ -368,7 +429,7 @@ func translatePackages(cache *cache.Cache, listPatterns []string, rootOutputDir 
 
 	listPatterns = append(listPatterns, TranslatedRuntimePackages...)
 
-	listedPkgs, err := loadPackages(listPatterns, cfg, loadDepGraph)
+	listedPkgs, err := loadPackages(listPatterns, cfg, loadDepGraph, true)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -450,14 +511,7 @@ func translatePackages(cache *cache.Cache, listPatterns []string, rootOutputDir 
 		}
 	}
 
-	reloaded, err := loadPackages(slices.Collect(maps.Keys(uncachedPackages)), cfg, loadSyntaxAndTypes)
-	if err != nil {
-		log.Fatal(err)
-	}
-	pkgsWithTypesAndAst := make(map[string]*packages.Package)
-	for _, pkg := range reloaded {
-		pkgsWithTypesAndAst[pkg.ID] = pkg
-	}
+	pkgsWithTypesAndAst := reloadUncachedPackages(listedPkgs, uncachedPackages, cfg)
 
 	replacedPkgs, packageNames := buildReplacePackagesAndPackageNames(convertPkgs, allPkgs)
 
