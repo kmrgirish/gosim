@@ -28,7 +28,9 @@ func TestReflectFormatMapInterface(t *testing.T) {
 
 	formatted1 := fmt.Sprint(map[any]int{"foo": 1, "bar": 2, x: 3, y: 4, &x: 10, &y: 11})
 	formatted2 := fmt.Sprint(map[any]int{"foo": 1, "bar": 2, x: 3, y: 4, &x: 10, &y: 11})
-	t.Log(formatted1)
+	// TODO: somehow allow this log
+	// do not log, it is not deterministic...
+	// t.Log(formatted1)
 	if formatted1 != formatted2 {
 		t.Error(formatted1)
 	}
