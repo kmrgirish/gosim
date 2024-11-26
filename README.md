@@ -280,6 +280,16 @@ Now we can inspect the state of memory to see details that the log line might ha
 "11.0.0.1:10001"
 ```
 
+## Examples
+
+Gosim can run some sizeable real-world code. In this repository
+there are examples for:
+
+- [examples/bolt](./examples/bolt/): reading and writing a [Bolt](https://github.com/etcd-io/bbolt) database
+
+- [examples/etcd](./examples/etcd/): running a 3-node [Etcd](https://github.com/etcd-io/etcd) cluster and partitioning the
+  nodes
+
 # API and documentation
 
 A description of Gosim's architecture and design decisions is in
