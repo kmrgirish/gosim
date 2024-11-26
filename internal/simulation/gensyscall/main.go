@@ -182,9 +182,9 @@ type syscallInfo struct {
 	pkg                   string
 	funcName              string
 	sysName               string
-	sysVal                int
 	inputsStr, outputsStr string
 	async                 bool
+	synthetic             bool
 }
 
 var filterCommon = []string{
@@ -528,9 +528,6 @@ func writeSyscalls(outputPath string, syscalls []syscallInfo, isMachine bool) {
 		parseDispatchText := ""
 
 		sysVal := fmt.Sprintf("unix.%s", sysName)
-		if info.sysVal != 0 {
-			sysVal = fmt.Sprint(info.sysVal)
-		}
 
 		var callerRets, dispatchRets, ifaceRets []string
 
@@ -568,7 +565,7 @@ func writeSyscalls(outputPath string, syscalls []syscallInfo, isMachine bool) {
 			parseDispatchText += "\t\tsyscall.Complete()\n"
 		}
 
-		if info.sysVal == 0 {
+		if !info.synthetic {
 			checkText := fmt.Sprintf("\tcase %s:\n", sysVal) +
 				"\t\treturn true\n"
 			checks.append(sysName, checkText)
@@ -685,15 +682,15 @@ func main() {
 		deduped = append(deduped, []syscallInfo{
 			{
 				sysName:    "POLL_OPEN",
-				sysVal:     1000,
 				inputsStr:  "fd int, desc *syscallabi.PollDesc",
 				outputsStr: "code int",
+				synthetic:  true,
 			},
 			{
 				sysName:    "POLL_CLOSE",
-				sysVal:     1001,
 				inputsStr:  "fd int, desc *syscallabi.PollDesc",
 				outputsStr: "code int",
+				synthetic:  true,
 			},
 		}...)
 
@@ -705,75 +702,84 @@ func main() {
 			sysName:    "SET_SIMULATION_TIMEOUT",
 			inputsStr:  "timeout time.Duration",
 			outputsStr: "err error",
+			synthetic:  true,
 		},
 		{
 			sysName:    "SET_CONNECTED",
 			inputsStr:  "a string, b string, connected bool",
 			outputsStr: "err error",
+			synthetic:  true,
 		},
 		{
 			sysName:    "SET_DELAY",
 			inputsStr:  "a string, b string, delay time.Duration",
 			outputsStr: "err error",
+			synthetic:  true,
 		},
 		{
 			sysName:    "MACHINE_NEW",
 			inputsStr:  "label string, addr string, program any",
 			outputsStr: "machineID int",
+			synthetic:  true,
 		},
 		{
 			sysName:   "MACHINE_STOP",
 			inputsStr: "machineID int, graceful bool",
+			synthetic: true,
 		},
 		{
 			sysName:   "MACHINE_INODE_INFO",
 			inputsStr: "machineID int, inodeID int, info *fs.InodeInfo",
+			synthetic: true,
 		},
 		{
 			sysName:   "MACHINE_WAIT",
 			inputsStr: "machineID int",
 			async:     true,
+			synthetic: true,
 		},
 		{
 			sysName:    "MACHINE_RECOVER_INIT",
 			inputsStr:  "machineID int, program any",
 			outputsStr: "iterID int",
+			synthetic:  true,
 		},
 		{
 			sysName:    "MACHINE_RECOVER_NEXT",
 			inputsStr:  "iterID int",
 			outputsStr: "machineID int, ok bool",
+			synthetic:  true,
 		},
 		{
 			sysName:    "MACHINE_RECOVER_RELEASE",
 			inputsStr:  "iterID int",
 			outputsStr: "",
+			synthetic:  true,
 		},
 		{
 			sysName:    "MACHINE_RESTART",
 			inputsStr:  "machineID int, partialDisk bool",
 			outputsStr: "err error",
+			synthetic:  true,
 		},
 		{
 			sysName:    "MACHINE_GET_LABEL",
 			inputsStr:  "machineID int",
 			outputsStr: "label string, err error",
+			synthetic:  true,
 		},
 		{
 			sysName:    "MACHINE_SET_BOOT_PROGRAM",
 			inputsStr:  "machineID int, program any",
 			outputsStr: "err error",
+			synthetic:  true,
 		},
 		{
 			sysName:    "MACHINE_SET_SOMETIMES_CRASH_ON_SYNC",
 			inputsStr:  "machineID int, crash bool",
 			outputsStr: "err error",
+			synthetic:  true,
 		},
-	}
-
-	for i := range machineCalls {
-		call := &machineCalls[i]
-		call.sysVal = 1000 + i
 	}
 
 	writeSyscalls(path.Join(rootDir, "internal/simulation/gosim_gensyscall.go"), machineCalls, true)
