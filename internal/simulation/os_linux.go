@@ -94,7 +94,8 @@ func RawSyscall6(trap, a1, a2, a3, a4, a5, a6 uintptr) (r1, r2 uintptr, err sysc
 		panic("syscall should have been rewritten somewhere")
 	}
 
-	logf("unknown=%d %d %d %d %d %d %d", trap, a1, a2, a3, a4, a5, a6)
+	// TODO: test this
+	logf("unsupported syscall %s (%d) %d %d %d %d %d %d", SyscallName(trap), trap, a1, a2, a3, a4, a5, a6)
 
 	return 0, 0, syscall.ENOSYS
 }

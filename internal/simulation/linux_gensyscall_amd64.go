@@ -1059,3 +1059,761 @@ func IsHandledSyscall(trap uintptr) bool {
 		return false
 	}
 }
+
+func SyscallName(trap uintptr) string {
+	switch trap {
+	case unix.SYS_READ: // 0
+		return "SYS_READ"
+	case unix.SYS_WRITE: // 1
+		return "SYS_WRITE"
+	case unix.SYS_OPEN: // 2
+		return "SYS_OPEN"
+	case unix.SYS_CLOSE: // 3
+		return "SYS_CLOSE"
+	case unix.SYS_STAT: // 4
+		return "SYS_STAT"
+	case unix.SYS_FSTAT: // 5
+		return "SYS_FSTAT"
+	case unix.SYS_LSTAT: // 6
+		return "SYS_LSTAT"
+	case unix.SYS_POLL: // 7
+		return "SYS_POLL"
+	case unix.SYS_LSEEK: // 8
+		return "SYS_LSEEK"
+	case unix.SYS_MMAP: // 9
+		return "SYS_MMAP"
+	case unix.SYS_MPROTECT: // 10
+		return "SYS_MPROTECT"
+	case unix.SYS_MUNMAP: // 11
+		return "SYS_MUNMAP"
+	case unix.SYS_BRK: // 12
+		return "SYS_BRK"
+	case unix.SYS_RT_SIGACTION: // 13
+		return "SYS_RT_SIGACTION"
+	case unix.SYS_RT_SIGPROCMASK: // 14
+		return "SYS_RT_SIGPROCMASK"
+	case unix.SYS_RT_SIGRETURN: // 15
+		return "SYS_RT_SIGRETURN"
+	case unix.SYS_IOCTL: // 16
+		return "SYS_IOCTL"
+	case unix.SYS_PREAD64: // 17
+		return "SYS_PREAD64"
+	case unix.SYS_PWRITE64: // 18
+		return "SYS_PWRITE64"
+	case unix.SYS_READV: // 19
+		return "SYS_READV"
+	case unix.SYS_WRITEV: // 20
+		return "SYS_WRITEV"
+	case unix.SYS_ACCESS: // 21
+		return "SYS_ACCESS"
+	case unix.SYS_PIPE: // 22
+		return "SYS_PIPE"
+	case unix.SYS_SELECT: // 23
+		return "SYS_SELECT"
+	case unix.SYS_SCHED_YIELD: // 24
+		return "SYS_SCHED_YIELD"
+	case unix.SYS_MREMAP: // 25
+		return "SYS_MREMAP"
+	case unix.SYS_MSYNC: // 26
+		return "SYS_MSYNC"
+	case unix.SYS_MINCORE: // 27
+		return "SYS_MINCORE"
+	case unix.SYS_MADVISE: // 28
+		return "SYS_MADVISE"
+	case unix.SYS_SHMGET: // 29
+		return "SYS_SHMGET"
+	case unix.SYS_SHMAT: // 30
+		return "SYS_SHMAT"
+	case unix.SYS_SHMCTL: // 31
+		return "SYS_SHMCTL"
+	case unix.SYS_DUP: // 32
+		return "SYS_DUP"
+	case unix.SYS_DUP2: // 33
+		return "SYS_DUP2"
+	case unix.SYS_PAUSE: // 34
+		return "SYS_PAUSE"
+	case unix.SYS_NANOSLEEP: // 35
+		return "SYS_NANOSLEEP"
+	case unix.SYS_GETITIMER: // 36
+		return "SYS_GETITIMER"
+	case unix.SYS_ALARM: // 37
+		return "SYS_ALARM"
+	case unix.SYS_SETITIMER: // 38
+		return "SYS_SETITIMER"
+	case unix.SYS_GETPID: // 39
+		return "SYS_GETPID"
+	case unix.SYS_SENDFILE: // 40
+		return "SYS_SENDFILE"
+	case unix.SYS_SOCKET: // 41
+		return "SYS_SOCKET"
+	case unix.SYS_CONNECT: // 42
+		return "SYS_CONNECT"
+	case unix.SYS_ACCEPT: // 43
+		return "SYS_ACCEPT"
+	case unix.SYS_SENDTO: // 44
+		return "SYS_SENDTO"
+	case unix.SYS_RECVFROM: // 45
+		return "SYS_RECVFROM"
+	case unix.SYS_SENDMSG: // 46
+		return "SYS_SENDMSG"
+	case unix.SYS_RECVMSG: // 47
+		return "SYS_RECVMSG"
+	case unix.SYS_SHUTDOWN: // 48
+		return "SYS_SHUTDOWN"
+	case unix.SYS_BIND: // 49
+		return "SYS_BIND"
+	case unix.SYS_LISTEN: // 50
+		return "SYS_LISTEN"
+	case unix.SYS_GETSOCKNAME: // 51
+		return "SYS_GETSOCKNAME"
+	case unix.SYS_GETPEERNAME: // 52
+		return "SYS_GETPEERNAME"
+	case unix.SYS_SOCKETPAIR: // 53
+		return "SYS_SOCKETPAIR"
+	case unix.SYS_SETSOCKOPT: // 54
+		return "SYS_SETSOCKOPT"
+	case unix.SYS_GETSOCKOPT: // 55
+		return "SYS_GETSOCKOPT"
+	case unix.SYS_CLONE: // 56
+		return "SYS_CLONE"
+	case unix.SYS_FORK: // 57
+		return "SYS_FORK"
+	case unix.SYS_VFORK: // 58
+		return "SYS_VFORK"
+	case unix.SYS_EXECVE: // 59
+		return "SYS_EXECVE"
+	case unix.SYS_EXIT: // 60
+		return "SYS_EXIT"
+	case unix.SYS_WAIT4: // 61
+		return "SYS_WAIT4"
+	case unix.SYS_KILL: // 62
+		return "SYS_KILL"
+	case unix.SYS_UNAME: // 63
+		return "SYS_UNAME"
+	case unix.SYS_SEMGET: // 64
+		return "SYS_SEMGET"
+	case unix.SYS_SEMOP: // 65
+		return "SYS_SEMOP"
+	case unix.SYS_SEMCTL: // 66
+		return "SYS_SEMCTL"
+	case unix.SYS_SHMDT: // 67
+		return "SYS_SHMDT"
+	case unix.SYS_MSGGET: // 68
+		return "SYS_MSGGET"
+	case unix.SYS_MSGSND: // 69
+		return "SYS_MSGSND"
+	case unix.SYS_MSGRCV: // 70
+		return "SYS_MSGRCV"
+	case unix.SYS_MSGCTL: // 71
+		return "SYS_MSGCTL"
+	case unix.SYS_FCNTL: // 72
+		return "SYS_FCNTL"
+	case unix.SYS_FLOCK: // 73
+		return "SYS_FLOCK"
+	case unix.SYS_FSYNC: // 74
+		return "SYS_FSYNC"
+	case unix.SYS_FDATASYNC: // 75
+		return "SYS_FDATASYNC"
+	case unix.SYS_TRUNCATE: // 76
+		return "SYS_TRUNCATE"
+	case unix.SYS_FTRUNCATE: // 77
+		return "SYS_FTRUNCATE"
+	case unix.SYS_GETDENTS: // 78
+		return "SYS_GETDENTS"
+	case unix.SYS_GETCWD: // 79
+		return "SYS_GETCWD"
+	case unix.SYS_CHDIR: // 80
+		return "SYS_CHDIR"
+	case unix.SYS_FCHDIR: // 81
+		return "SYS_FCHDIR"
+	case unix.SYS_RENAME: // 82
+		return "SYS_RENAME"
+	case unix.SYS_MKDIR: // 83
+		return "SYS_MKDIR"
+	case unix.SYS_RMDIR: // 84
+		return "SYS_RMDIR"
+	case unix.SYS_CREAT: // 85
+		return "SYS_CREAT"
+	case unix.SYS_LINK: // 86
+		return "SYS_LINK"
+	case unix.SYS_UNLINK: // 87
+		return "SYS_UNLINK"
+	case unix.SYS_SYMLINK: // 88
+		return "SYS_SYMLINK"
+	case unix.SYS_READLINK: // 89
+		return "SYS_READLINK"
+	case unix.SYS_CHMOD: // 90
+		return "SYS_CHMOD"
+	case unix.SYS_FCHMOD: // 91
+		return "SYS_FCHMOD"
+	case unix.SYS_CHOWN: // 92
+		return "SYS_CHOWN"
+	case unix.SYS_FCHOWN: // 93
+		return "SYS_FCHOWN"
+	case unix.SYS_LCHOWN: // 94
+		return "SYS_LCHOWN"
+	case unix.SYS_UMASK: // 95
+		return "SYS_UMASK"
+	case unix.SYS_GETTIMEOFDAY: // 96
+		return "SYS_GETTIMEOFDAY"
+	case unix.SYS_GETRLIMIT: // 97
+		return "SYS_GETRLIMIT"
+	case unix.SYS_GETRUSAGE: // 98
+		return "SYS_GETRUSAGE"
+	case unix.SYS_SYSINFO: // 99
+		return "SYS_SYSINFO"
+	case unix.SYS_TIMES: // 100
+		return "SYS_TIMES"
+	case unix.SYS_PTRACE: // 101
+		return "SYS_PTRACE"
+	case unix.SYS_GETUID: // 102
+		return "SYS_GETUID"
+	case unix.SYS_SYSLOG: // 103
+		return "SYS_SYSLOG"
+	case unix.SYS_GETGID: // 104
+		return "SYS_GETGID"
+	case unix.SYS_SETUID: // 105
+		return "SYS_SETUID"
+	case unix.SYS_SETGID: // 106
+		return "SYS_SETGID"
+	case unix.SYS_GETEUID: // 107
+		return "SYS_GETEUID"
+	case unix.SYS_GETEGID: // 108
+		return "SYS_GETEGID"
+	case unix.SYS_SETPGID: // 109
+		return "SYS_SETPGID"
+	case unix.SYS_GETPPID: // 110
+		return "SYS_GETPPID"
+	case unix.SYS_GETPGRP: // 111
+		return "SYS_GETPGRP"
+	case unix.SYS_SETSID: // 112
+		return "SYS_SETSID"
+	case unix.SYS_SETREUID: // 113
+		return "SYS_SETREUID"
+	case unix.SYS_SETREGID: // 114
+		return "SYS_SETREGID"
+	case unix.SYS_GETGROUPS: // 115
+		return "SYS_GETGROUPS"
+	case unix.SYS_SETGROUPS: // 116
+		return "SYS_SETGROUPS"
+	case unix.SYS_SETRESUID: // 117
+		return "SYS_SETRESUID"
+	case unix.SYS_GETRESUID: // 118
+		return "SYS_GETRESUID"
+	case unix.SYS_SETRESGID: // 119
+		return "SYS_SETRESGID"
+	case unix.SYS_GETRESGID: // 120
+		return "SYS_GETRESGID"
+	case unix.SYS_GETPGID: // 121
+		return "SYS_GETPGID"
+	case unix.SYS_SETFSUID: // 122
+		return "SYS_SETFSUID"
+	case unix.SYS_SETFSGID: // 123
+		return "SYS_SETFSGID"
+	case unix.SYS_GETSID: // 124
+		return "SYS_GETSID"
+	case unix.SYS_CAPGET: // 125
+		return "SYS_CAPGET"
+	case unix.SYS_CAPSET: // 126
+		return "SYS_CAPSET"
+	case unix.SYS_RT_SIGPENDING: // 127
+		return "SYS_RT_SIGPENDING"
+	case unix.SYS_RT_SIGTIMEDWAIT: // 128
+		return "SYS_RT_SIGTIMEDWAIT"
+	case unix.SYS_RT_SIGQUEUEINFO: // 129
+		return "SYS_RT_SIGQUEUEINFO"
+	case unix.SYS_RT_SIGSUSPEND: // 130
+		return "SYS_RT_SIGSUSPEND"
+	case unix.SYS_SIGALTSTACK: // 131
+		return "SYS_SIGALTSTACK"
+	case unix.SYS_UTIME: // 132
+		return "SYS_UTIME"
+	case unix.SYS_MKNOD: // 133
+		return "SYS_MKNOD"
+	case unix.SYS_USELIB: // 134
+		return "SYS_USELIB"
+	case unix.SYS_PERSONALITY: // 135
+		return "SYS_PERSONALITY"
+	case unix.SYS_USTAT: // 136
+		return "SYS_USTAT"
+	case unix.SYS_STATFS: // 137
+		return "SYS_STATFS"
+	case unix.SYS_FSTATFS: // 138
+		return "SYS_FSTATFS"
+	case unix.SYS_SYSFS: // 139
+		return "SYS_SYSFS"
+	case unix.SYS_GETPRIORITY: // 140
+		return "SYS_GETPRIORITY"
+	case unix.SYS_SETPRIORITY: // 141
+		return "SYS_SETPRIORITY"
+	case unix.SYS_SCHED_SETPARAM: // 142
+		return "SYS_SCHED_SETPARAM"
+	case unix.SYS_SCHED_GETPARAM: // 143
+		return "SYS_SCHED_GETPARAM"
+	case unix.SYS_SCHED_SETSCHEDULER: // 144
+		return "SYS_SCHED_SETSCHEDULER"
+	case unix.SYS_SCHED_GETSCHEDULER: // 145
+		return "SYS_SCHED_GETSCHEDULER"
+	case unix.SYS_SCHED_GET_PRIORITY_MAX: // 146
+		return "SYS_SCHED_GET_PRIORITY_MAX"
+	case unix.SYS_SCHED_GET_PRIORITY_MIN: // 147
+		return "SYS_SCHED_GET_PRIORITY_MIN"
+	case unix.SYS_SCHED_RR_GET_INTERVAL: // 148
+		return "SYS_SCHED_RR_GET_INTERVAL"
+	case unix.SYS_MLOCK: // 149
+		return "SYS_MLOCK"
+	case unix.SYS_MUNLOCK: // 150
+		return "SYS_MUNLOCK"
+	case unix.SYS_MLOCKALL: // 151
+		return "SYS_MLOCKALL"
+	case unix.SYS_MUNLOCKALL: // 152
+		return "SYS_MUNLOCKALL"
+	case unix.SYS_VHANGUP: // 153
+		return "SYS_VHANGUP"
+	case unix.SYS_MODIFY_LDT: // 154
+		return "SYS_MODIFY_LDT"
+	case unix.SYS_PIVOT_ROOT: // 155
+		return "SYS_PIVOT_ROOT"
+	case unix.SYS__SYSCTL: // 156
+		return "SYS__SYSCTL"
+	case unix.SYS_PRCTL: // 157
+		return "SYS_PRCTL"
+	case unix.SYS_ARCH_PRCTL: // 158
+		return "SYS_ARCH_PRCTL"
+	case unix.SYS_ADJTIMEX: // 159
+		return "SYS_ADJTIMEX"
+	case unix.SYS_SETRLIMIT: // 160
+		return "SYS_SETRLIMIT"
+	case unix.SYS_CHROOT: // 161
+		return "SYS_CHROOT"
+	case unix.SYS_SYNC: // 162
+		return "SYS_SYNC"
+	case unix.SYS_ACCT: // 163
+		return "SYS_ACCT"
+	case unix.SYS_SETTIMEOFDAY: // 164
+		return "SYS_SETTIMEOFDAY"
+	case unix.SYS_MOUNT: // 165
+		return "SYS_MOUNT"
+	case unix.SYS_UMOUNT2: // 166
+		return "SYS_UMOUNT2"
+	case unix.SYS_SWAPON: // 167
+		return "SYS_SWAPON"
+	case unix.SYS_SWAPOFF: // 168
+		return "SYS_SWAPOFF"
+	case unix.SYS_REBOOT: // 169
+		return "SYS_REBOOT"
+	case unix.SYS_SETHOSTNAME: // 170
+		return "SYS_SETHOSTNAME"
+	case unix.SYS_SETDOMAINNAME: // 171
+		return "SYS_SETDOMAINNAME"
+	case unix.SYS_IOPL: // 172
+		return "SYS_IOPL"
+	case unix.SYS_IOPERM: // 173
+		return "SYS_IOPERM"
+	case unix.SYS_CREATE_MODULE: // 174
+		return "SYS_CREATE_MODULE"
+	case unix.SYS_INIT_MODULE: // 175
+		return "SYS_INIT_MODULE"
+	case unix.SYS_DELETE_MODULE: // 176
+		return "SYS_DELETE_MODULE"
+	case unix.SYS_GET_KERNEL_SYMS: // 177
+		return "SYS_GET_KERNEL_SYMS"
+	case unix.SYS_QUERY_MODULE: // 178
+		return "SYS_QUERY_MODULE"
+	case unix.SYS_QUOTACTL: // 179
+		return "SYS_QUOTACTL"
+	case unix.SYS_NFSSERVCTL: // 180
+		return "SYS_NFSSERVCTL"
+	case unix.SYS_GETPMSG: // 181
+		return "SYS_GETPMSG"
+	case unix.SYS_PUTPMSG: // 182
+		return "SYS_PUTPMSG"
+	case unix.SYS_AFS_SYSCALL: // 183
+		return "SYS_AFS_SYSCALL"
+	case unix.SYS_TUXCALL: // 184
+		return "SYS_TUXCALL"
+	case unix.SYS_SECURITY: // 185
+		return "SYS_SECURITY"
+	case unix.SYS_GETTID: // 186
+		return "SYS_GETTID"
+	case unix.SYS_READAHEAD: // 187
+		return "SYS_READAHEAD"
+	case unix.SYS_SETXATTR: // 188
+		return "SYS_SETXATTR"
+	case unix.SYS_LSETXATTR: // 189
+		return "SYS_LSETXATTR"
+	case unix.SYS_FSETXATTR: // 190
+		return "SYS_FSETXATTR"
+	case unix.SYS_GETXATTR: // 191
+		return "SYS_GETXATTR"
+	case unix.SYS_LGETXATTR: // 192
+		return "SYS_LGETXATTR"
+	case unix.SYS_FGETXATTR: // 193
+		return "SYS_FGETXATTR"
+	case unix.SYS_LISTXATTR: // 194
+		return "SYS_LISTXATTR"
+	case unix.SYS_LLISTXATTR: // 195
+		return "SYS_LLISTXATTR"
+	case unix.SYS_FLISTXATTR: // 196
+		return "SYS_FLISTXATTR"
+	case unix.SYS_REMOVEXATTR: // 197
+		return "SYS_REMOVEXATTR"
+	case unix.SYS_LREMOVEXATTR: // 198
+		return "SYS_LREMOVEXATTR"
+	case unix.SYS_FREMOVEXATTR: // 199
+		return "SYS_FREMOVEXATTR"
+	case unix.SYS_TKILL: // 200
+		return "SYS_TKILL"
+	case unix.SYS_TIME: // 201
+		return "SYS_TIME"
+	case unix.SYS_FUTEX: // 202
+		return "SYS_FUTEX"
+	case unix.SYS_SCHED_SETAFFINITY: // 203
+		return "SYS_SCHED_SETAFFINITY"
+	case unix.SYS_SCHED_GETAFFINITY: // 204
+		return "SYS_SCHED_GETAFFINITY"
+	case unix.SYS_SET_THREAD_AREA: // 205
+		return "SYS_SET_THREAD_AREA"
+	case unix.SYS_IO_SETUP: // 206
+		return "SYS_IO_SETUP"
+	case unix.SYS_IO_DESTROY: // 207
+		return "SYS_IO_DESTROY"
+	case unix.SYS_IO_GETEVENTS: // 208
+		return "SYS_IO_GETEVENTS"
+	case unix.SYS_IO_SUBMIT: // 209
+		return "SYS_IO_SUBMIT"
+	case unix.SYS_IO_CANCEL: // 210
+		return "SYS_IO_CANCEL"
+	case unix.SYS_GET_THREAD_AREA: // 211
+		return "SYS_GET_THREAD_AREA"
+	case unix.SYS_LOOKUP_DCOOKIE: // 212
+		return "SYS_LOOKUP_DCOOKIE"
+	case unix.SYS_EPOLL_CREATE: // 213
+		return "SYS_EPOLL_CREATE"
+	case unix.SYS_EPOLL_CTL_OLD: // 214
+		return "SYS_EPOLL_CTL_OLD"
+	case unix.SYS_EPOLL_WAIT_OLD: // 215
+		return "SYS_EPOLL_WAIT_OLD"
+	case unix.SYS_REMAP_FILE_PAGES: // 216
+		return "SYS_REMAP_FILE_PAGES"
+	case unix.SYS_GETDENTS64: // 217
+		return "SYS_GETDENTS64"
+	case unix.SYS_SET_TID_ADDRESS: // 218
+		return "SYS_SET_TID_ADDRESS"
+	case unix.SYS_RESTART_SYSCALL: // 219
+		return "SYS_RESTART_SYSCALL"
+	case unix.SYS_SEMTIMEDOP: // 220
+		return "SYS_SEMTIMEDOP"
+	case unix.SYS_FADVISE64: // 221
+		return "SYS_FADVISE64"
+	case unix.SYS_TIMER_CREATE: // 222
+		return "SYS_TIMER_CREATE"
+	case unix.SYS_TIMER_SETTIME: // 223
+		return "SYS_TIMER_SETTIME"
+	case unix.SYS_TIMER_GETTIME: // 224
+		return "SYS_TIMER_GETTIME"
+	case unix.SYS_TIMER_GETOVERRUN: // 225
+		return "SYS_TIMER_GETOVERRUN"
+	case unix.SYS_TIMER_DELETE: // 226
+		return "SYS_TIMER_DELETE"
+	case unix.SYS_CLOCK_SETTIME: // 227
+		return "SYS_CLOCK_SETTIME"
+	case unix.SYS_CLOCK_GETTIME: // 228
+		return "SYS_CLOCK_GETTIME"
+	case unix.SYS_CLOCK_GETRES: // 229
+		return "SYS_CLOCK_GETRES"
+	case unix.SYS_CLOCK_NANOSLEEP: // 230
+		return "SYS_CLOCK_NANOSLEEP"
+	case unix.SYS_EXIT_GROUP: // 231
+		return "SYS_EXIT_GROUP"
+	case unix.SYS_EPOLL_WAIT: // 232
+		return "SYS_EPOLL_WAIT"
+	case unix.SYS_EPOLL_CTL: // 233
+		return "SYS_EPOLL_CTL"
+	case unix.SYS_TGKILL: // 234
+		return "SYS_TGKILL"
+	case unix.SYS_UTIMES: // 235
+		return "SYS_UTIMES"
+	case unix.SYS_VSERVER: // 236
+		return "SYS_VSERVER"
+	case unix.SYS_MBIND: // 237
+		return "SYS_MBIND"
+	case unix.SYS_SET_MEMPOLICY: // 238
+		return "SYS_SET_MEMPOLICY"
+	case unix.SYS_GET_MEMPOLICY: // 239
+		return "SYS_GET_MEMPOLICY"
+	case unix.SYS_MQ_OPEN: // 240
+		return "SYS_MQ_OPEN"
+	case unix.SYS_MQ_UNLINK: // 241
+		return "SYS_MQ_UNLINK"
+	case unix.SYS_MQ_TIMEDSEND: // 242
+		return "SYS_MQ_TIMEDSEND"
+	case unix.SYS_MQ_TIMEDRECEIVE: // 243
+		return "SYS_MQ_TIMEDRECEIVE"
+	case unix.SYS_MQ_NOTIFY: // 244
+		return "SYS_MQ_NOTIFY"
+	case unix.SYS_MQ_GETSETATTR: // 245
+		return "SYS_MQ_GETSETATTR"
+	case unix.SYS_KEXEC_LOAD: // 246
+		return "SYS_KEXEC_LOAD"
+	case unix.SYS_WAITID: // 247
+		return "SYS_WAITID"
+	case unix.SYS_ADD_KEY: // 248
+		return "SYS_ADD_KEY"
+	case unix.SYS_REQUEST_KEY: // 249
+		return "SYS_REQUEST_KEY"
+	case unix.SYS_KEYCTL: // 250
+		return "SYS_KEYCTL"
+	case unix.SYS_IOPRIO_SET: // 251
+		return "SYS_IOPRIO_SET"
+	case unix.SYS_IOPRIO_GET: // 252
+		return "SYS_IOPRIO_GET"
+	case unix.SYS_INOTIFY_INIT: // 253
+		return "SYS_INOTIFY_INIT"
+	case unix.SYS_INOTIFY_ADD_WATCH: // 254
+		return "SYS_INOTIFY_ADD_WATCH"
+	case unix.SYS_INOTIFY_RM_WATCH: // 255
+		return "SYS_INOTIFY_RM_WATCH"
+	case unix.SYS_MIGRATE_PAGES: // 256
+		return "SYS_MIGRATE_PAGES"
+	case unix.SYS_OPENAT: // 257
+		return "SYS_OPENAT"
+	case unix.SYS_MKDIRAT: // 258
+		return "SYS_MKDIRAT"
+	case unix.SYS_MKNODAT: // 259
+		return "SYS_MKNODAT"
+	case unix.SYS_FCHOWNAT: // 260
+		return "SYS_FCHOWNAT"
+	case unix.SYS_FUTIMESAT: // 261
+		return "SYS_FUTIMESAT"
+	case unix.SYS_NEWFSTATAT: // 262
+		return "SYS_NEWFSTATAT"
+	case unix.SYS_UNLINKAT: // 263
+		return "SYS_UNLINKAT"
+	case unix.SYS_RENAMEAT: // 264
+		return "SYS_RENAMEAT"
+	case unix.SYS_LINKAT: // 265
+		return "SYS_LINKAT"
+	case unix.SYS_SYMLINKAT: // 266
+		return "SYS_SYMLINKAT"
+	case unix.SYS_READLINKAT: // 267
+		return "SYS_READLINKAT"
+	case unix.SYS_FCHMODAT: // 268
+		return "SYS_FCHMODAT"
+	case unix.SYS_FACCESSAT: // 269
+		return "SYS_FACCESSAT"
+	case unix.SYS_PSELECT6: // 270
+		return "SYS_PSELECT6"
+	case unix.SYS_PPOLL: // 271
+		return "SYS_PPOLL"
+	case unix.SYS_UNSHARE: // 272
+		return "SYS_UNSHARE"
+	case unix.SYS_SET_ROBUST_LIST: // 273
+		return "SYS_SET_ROBUST_LIST"
+	case unix.SYS_GET_ROBUST_LIST: // 274
+		return "SYS_GET_ROBUST_LIST"
+	case unix.SYS_SPLICE: // 275
+		return "SYS_SPLICE"
+	case unix.SYS_TEE: // 276
+		return "SYS_TEE"
+	case unix.SYS_SYNC_FILE_RANGE: // 277
+		return "SYS_SYNC_FILE_RANGE"
+	case unix.SYS_VMSPLICE: // 278
+		return "SYS_VMSPLICE"
+	case unix.SYS_MOVE_PAGES: // 279
+		return "SYS_MOVE_PAGES"
+	case unix.SYS_UTIMENSAT: // 280
+		return "SYS_UTIMENSAT"
+	case unix.SYS_EPOLL_PWAIT: // 281
+		return "SYS_EPOLL_PWAIT"
+	case unix.SYS_SIGNALFD: // 282
+		return "SYS_SIGNALFD"
+	case unix.SYS_TIMERFD_CREATE: // 283
+		return "SYS_TIMERFD_CREATE"
+	case unix.SYS_EVENTFD: // 284
+		return "SYS_EVENTFD"
+	case unix.SYS_FALLOCATE: // 285
+		return "SYS_FALLOCATE"
+	case unix.SYS_TIMERFD_SETTIME: // 286
+		return "SYS_TIMERFD_SETTIME"
+	case unix.SYS_TIMERFD_GETTIME: // 287
+		return "SYS_TIMERFD_GETTIME"
+	case unix.SYS_ACCEPT4: // 288
+		return "SYS_ACCEPT4"
+	case unix.SYS_SIGNALFD4: // 289
+		return "SYS_SIGNALFD4"
+	case unix.SYS_EVENTFD2: // 290
+		return "SYS_EVENTFD2"
+	case unix.SYS_EPOLL_CREATE1: // 291
+		return "SYS_EPOLL_CREATE1"
+	case unix.SYS_DUP3: // 292
+		return "SYS_DUP3"
+	case unix.SYS_PIPE2: // 293
+		return "SYS_PIPE2"
+	case unix.SYS_INOTIFY_INIT1: // 294
+		return "SYS_INOTIFY_INIT1"
+	case unix.SYS_PREADV: // 295
+		return "SYS_PREADV"
+	case unix.SYS_PWRITEV: // 296
+		return "SYS_PWRITEV"
+	case unix.SYS_RT_TGSIGQUEUEINFO: // 297
+		return "SYS_RT_TGSIGQUEUEINFO"
+	case unix.SYS_PERF_EVENT_OPEN: // 298
+		return "SYS_PERF_EVENT_OPEN"
+	case unix.SYS_RECVMMSG: // 299
+		return "SYS_RECVMMSG"
+	case unix.SYS_FANOTIFY_INIT: // 300
+		return "SYS_FANOTIFY_INIT"
+	case unix.SYS_FANOTIFY_MARK: // 301
+		return "SYS_FANOTIFY_MARK"
+	case unix.SYS_PRLIMIT64: // 302
+		return "SYS_PRLIMIT64"
+	case unix.SYS_NAME_TO_HANDLE_AT: // 303
+		return "SYS_NAME_TO_HANDLE_AT"
+	case unix.SYS_OPEN_BY_HANDLE_AT: // 304
+		return "SYS_OPEN_BY_HANDLE_AT"
+	case unix.SYS_CLOCK_ADJTIME: // 305
+		return "SYS_CLOCK_ADJTIME"
+	case unix.SYS_SYNCFS: // 306
+		return "SYS_SYNCFS"
+	case unix.SYS_SENDMMSG: // 307
+		return "SYS_SENDMMSG"
+	case unix.SYS_SETNS: // 308
+		return "SYS_SETNS"
+	case unix.SYS_GETCPU: // 309
+		return "SYS_GETCPU"
+	case unix.SYS_PROCESS_VM_READV: // 310
+		return "SYS_PROCESS_VM_READV"
+	case unix.SYS_PROCESS_VM_WRITEV: // 311
+		return "SYS_PROCESS_VM_WRITEV"
+	case unix.SYS_KCMP: // 312
+		return "SYS_KCMP"
+	case unix.SYS_FINIT_MODULE: // 313
+		return "SYS_FINIT_MODULE"
+	case unix.SYS_SCHED_SETATTR: // 314
+		return "SYS_SCHED_SETATTR"
+	case unix.SYS_SCHED_GETATTR: // 315
+		return "SYS_SCHED_GETATTR"
+	case unix.SYS_RENAMEAT2: // 316
+		return "SYS_RENAMEAT2"
+	case unix.SYS_SECCOMP: // 317
+		return "SYS_SECCOMP"
+	case unix.SYS_GETRANDOM: // 318
+		return "SYS_GETRANDOM"
+	case unix.SYS_MEMFD_CREATE: // 319
+		return "SYS_MEMFD_CREATE"
+	case unix.SYS_KEXEC_FILE_LOAD: // 320
+		return "SYS_KEXEC_FILE_LOAD"
+	case unix.SYS_BPF: // 321
+		return "SYS_BPF"
+	case unix.SYS_EXECVEAT: // 322
+		return "SYS_EXECVEAT"
+	case unix.SYS_USERFAULTFD: // 323
+		return "SYS_USERFAULTFD"
+	case unix.SYS_MEMBARRIER: // 324
+		return "SYS_MEMBARRIER"
+	case unix.SYS_MLOCK2: // 325
+		return "SYS_MLOCK2"
+	case unix.SYS_COPY_FILE_RANGE: // 326
+		return "SYS_COPY_FILE_RANGE"
+	case unix.SYS_PREADV2: // 327
+		return "SYS_PREADV2"
+	case unix.SYS_PWRITEV2: // 328
+		return "SYS_PWRITEV2"
+	case unix.SYS_PKEY_MPROTECT: // 329
+		return "SYS_PKEY_MPROTECT"
+	case unix.SYS_PKEY_ALLOC: // 330
+		return "SYS_PKEY_ALLOC"
+	case unix.SYS_PKEY_FREE: // 331
+		return "SYS_PKEY_FREE"
+	case unix.SYS_STATX: // 332
+		return "SYS_STATX"
+	case unix.SYS_IO_PGETEVENTS: // 333
+		return "SYS_IO_PGETEVENTS"
+	case unix.SYS_RSEQ: // 334
+		return "SYS_RSEQ"
+	case unix.SYS_URETPROBE: // 335
+		return "SYS_URETPROBE"
+	case unix.SYS_PIDFD_SEND_SIGNAL: // 424
+		return "SYS_PIDFD_SEND_SIGNAL"
+	case unix.SYS_IO_URING_SETUP: // 425
+		return "SYS_IO_URING_SETUP"
+	case unix.SYS_IO_URING_ENTER: // 426
+		return "SYS_IO_URING_ENTER"
+	case unix.SYS_IO_URING_REGISTER: // 427
+		return "SYS_IO_URING_REGISTER"
+	case unix.SYS_OPEN_TREE: // 428
+		return "SYS_OPEN_TREE"
+	case unix.SYS_MOVE_MOUNT: // 429
+		return "SYS_MOVE_MOUNT"
+	case unix.SYS_FSOPEN: // 430
+		return "SYS_FSOPEN"
+	case unix.SYS_FSCONFIG: // 431
+		return "SYS_FSCONFIG"
+	case unix.SYS_FSMOUNT: // 432
+		return "SYS_FSMOUNT"
+	case unix.SYS_FSPICK: // 433
+		return "SYS_FSPICK"
+	case unix.SYS_PIDFD_OPEN: // 434
+		return "SYS_PIDFD_OPEN"
+	case unix.SYS_CLONE3: // 435
+		return "SYS_CLONE3"
+	case unix.SYS_CLOSE_RANGE: // 436
+		return "SYS_CLOSE_RANGE"
+	case unix.SYS_OPENAT2: // 437
+		return "SYS_OPENAT2"
+	case unix.SYS_PIDFD_GETFD: // 438
+		return "SYS_PIDFD_GETFD"
+	case unix.SYS_FACCESSAT2: // 439
+		return "SYS_FACCESSAT2"
+	case unix.SYS_PROCESS_MADVISE: // 440
+		return "SYS_PROCESS_MADVISE"
+	case unix.SYS_EPOLL_PWAIT2: // 441
+		return "SYS_EPOLL_PWAIT2"
+	case unix.SYS_MOUNT_SETATTR: // 442
+		return "SYS_MOUNT_SETATTR"
+	case unix.SYS_QUOTACTL_FD: // 443
+		return "SYS_QUOTACTL_FD"
+	case unix.SYS_LANDLOCK_CREATE_RULESET: // 444
+		return "SYS_LANDLOCK_CREATE_RULESET"
+	case unix.SYS_LANDLOCK_ADD_RULE: // 445
+		return "SYS_LANDLOCK_ADD_RULE"
+	case unix.SYS_LANDLOCK_RESTRICT_SELF: // 446
+		return "SYS_LANDLOCK_RESTRICT_SELF"
+	case unix.SYS_MEMFD_SECRET: // 447
+		return "SYS_MEMFD_SECRET"
+	case unix.SYS_PROCESS_MRELEASE: // 448
+		return "SYS_PROCESS_MRELEASE"
+	case unix.SYS_FUTEX_WAITV: // 449
+		return "SYS_FUTEX_WAITV"
+	case unix.SYS_SET_MEMPOLICY_HOME_NODE: // 450
+		return "SYS_SET_MEMPOLICY_HOME_NODE"
+	case unix.SYS_CACHESTAT: // 451
+		return "SYS_CACHESTAT"
+	case unix.SYS_FCHMODAT2: // 452
+		return "SYS_FCHMODAT2"
+	case unix.SYS_MAP_SHADOW_STACK: // 453
+		return "SYS_MAP_SHADOW_STACK"
+	case unix.SYS_FUTEX_WAKE: // 454
+		return "SYS_FUTEX_WAKE"
+	case unix.SYS_FUTEX_WAIT: // 455
+		return "SYS_FUTEX_WAIT"
+	case unix.SYS_FUTEX_REQUEUE: // 456
+		return "SYS_FUTEX_REQUEUE"
+	case unix.SYS_STATMOUNT: // 457
+		return "SYS_STATMOUNT"
+	case unix.SYS_LISTMOUNT: // 458
+		return "SYS_LISTMOUNT"
+	case unix.SYS_LSM_GET_SELF_ATTR: // 459
+		return "SYS_LSM_GET_SELF_ATTR"
+	case unix.SYS_LSM_SET_SELF_ATTR: // 460
+		return "SYS_LSM_SET_SELF_ATTR"
+	case unix.SYS_LSM_LIST_MODULES: // 461
+		return "SYS_LSM_LIST_MODULES"
+	case unix.SYS_MSEAL: // 462
+		return "SYS_MSEAL"
+
+	default:
+		return "unknown"
+	}
+}

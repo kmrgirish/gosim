@@ -466,7 +466,7 @@ func init() {
 `)
 }
 
-func writeSyscalls(outputPath string, syscalls []syscallInfo, isMachine bool) {
+func writeSyscalls(outputPath string, syscalls []syscallInfo, sysnums map[string]int, isMachine bool) {
 	osTypeName := "LinuxOS"
 	osImplName := "linuxOS"
 	osIfaceName := "linuxOSIface"
@@ -654,7 +654,154 @@ func IsHandledSyscall(trap uintptr) bool {
 `
 	}
 
+	if !isMachine {
+		output += formatSysnums(sysnums)
+	}
+
 	writeFormattedGoFile(outputPath, output)
+}
+
+var machineCalls = []syscallInfo{
+	{
+		sysName:    "SET_SIMULATION_TIMEOUT",
+		inputsStr:  "timeout time.Duration",
+		outputsStr: "err error",
+		synthetic:  true,
+	},
+	{
+		sysName:    "SET_CONNECTED",
+		inputsStr:  "a string, b string, connected bool",
+		outputsStr: "err error",
+		synthetic:  true,
+	},
+	{
+		sysName:    "SET_DELAY",
+		inputsStr:  "a string, b string, delay time.Duration",
+		outputsStr: "err error",
+		synthetic:  true,
+	},
+	{
+		sysName:    "MACHINE_NEW",
+		inputsStr:  "label string, addr string, program any",
+		outputsStr: "machineID int",
+		synthetic:  true,
+	},
+	{
+		sysName:   "MACHINE_STOP",
+		inputsStr: "machineID int, graceful bool",
+		synthetic: true,
+	},
+	{
+		sysName:   "MACHINE_INODE_INFO",
+		inputsStr: "machineID int, inodeID int, info *fs.InodeInfo",
+		synthetic: true,
+	},
+	{
+		sysName:   "MACHINE_WAIT",
+		inputsStr: "machineID int",
+		async:     true,
+		synthetic: true,
+	},
+	{
+		sysName:    "MACHINE_RECOVER_INIT",
+		inputsStr:  "machineID int, program any",
+		outputsStr: "iterID int",
+		synthetic:  true,
+	},
+	{
+		sysName:    "MACHINE_RECOVER_NEXT",
+		inputsStr:  "iterID int",
+		outputsStr: "machineID int, ok bool",
+		synthetic:  true,
+	},
+	{
+		sysName:    "MACHINE_RECOVER_RELEASE",
+		inputsStr:  "iterID int",
+		outputsStr: "",
+		synthetic:  true,
+	},
+	{
+		sysName:    "MACHINE_RESTART",
+		inputsStr:  "machineID int, partialDisk bool",
+		outputsStr: "err error",
+		synthetic:  true,
+	},
+	{
+		sysName:    "MACHINE_GET_LABEL",
+		inputsStr:  "machineID int",
+		outputsStr: "label string, err error",
+		synthetic:  true,
+	},
+	{
+		sysName:    "MACHINE_SET_BOOT_PROGRAM",
+		inputsStr:  "machineID int, program any",
+		outputsStr: "err error",
+		synthetic:  true,
+	},
+	{
+		sysName:    "MACHINE_SET_SOMETIMES_CRASH_ON_SYNC",
+		inputsStr:  "machineID int, crash bool",
+		outputsStr: "err error",
+		synthetic:  true,
+	},
+}
+
+var (
+	regexpSysMatch  = regexp.MustCompile(`SYS_`)
+	regexpSysNumber = regexp.MustCompile(`^\s+(SYS_[A-Z0-9_]*)\s+=\s+([0-9]+)$`)
+)
+
+func parseSysnums(paths []string) map[string]int {
+	sources := findAndReadSources(paths)
+
+	result := make(map[string]int)
+
+	for _, contents := range sources {
+		// fmt.Println(file) // , "\n", string(contents[:1024]))
+
+		s := bufio.NewScanner(bytes.NewReader(contents))
+		for s.Scan() {
+			t := s.Text()
+
+			if regexpSysMatch.FindStringSubmatch(t) == nil {
+				continue
+			}
+
+			f := regexpSysNumber.FindStringSubmatch(t)
+			if f == nil {
+				log.Fatalf("failed to match line %s", t)
+			}
+
+			name, number := f[1], f[2]
+
+			parsedNumber, err := strconv.Atoi(number)
+			if err != nil {
+				log.Fatalf("parsing line %s: %s", t, err)
+			}
+
+			result[name] = parsedNumber
+		}
+	}
+
+	return result
+}
+
+func formatSysnums(sysnums map[string]int) string {
+	sorted := newOutputSorter()
+	for name, num := range sysnums {
+		sorted.append(fmt.Sprintf("%08d", num), fmt.Sprintf("\tcase unix.%s:// %d\n return %s\n", name, num, strconv.Quote(name)))
+	}
+
+	return fmt.Sprintf(`
+	
+func SyscallName(trap uintptr) string {
+	switch trap {
+		%s
+	default:
+		return "unknown"
+	}
+}
+`, sorted.output())
 }
 
 func main() {
@@ -676,6 +823,10 @@ func main() {
 			"golang.org/x/sys/unix/syscall_linux_" + arch + ".go",
 		}, filter[arch])
 
+		sysnums := parseSysnums([]string{
+			"golang.org/x/sys/unix/zsysnum_linux_" + arch + ".go",
+		})
+
 		writeProxies(rootDir, pkgs, syscalls, "go123", arch)
 		deduped := dedupSyscalls(syscalls)
 
@@ -694,93 +845,8 @@ func main() {
 			},
 		}...)
 
-		writeSyscalls(path.Join(rootDir, "internal/simulation/linux_gensyscall_"+arch+".go"), deduped, false)
+		writeSyscalls(path.Join(rootDir, "internal/simulation/linux_gensyscall_"+arch+".go"), deduped, sysnums, false)
 	}
 
-	machineCalls := []syscallInfo{
-		{
-			sysName:    "SET_SIMULATION_TIMEOUT",
-			inputsStr:  "timeout time.Duration",
-			outputsStr: "err error",
-			synthetic:  true,
-		},
-		{
-			sysName:    "SET_CONNECTED",
-			inputsStr:  "a string, b string, connected bool",
-			outputsStr: "err error",
-			synthetic:  true,
-		},
-		{
-			sysName:    "SET_DELAY",
-			inputsStr:  "a string, b string, delay time.Duration",
-			outputsStr: "err error",
-			synthetic:  true,
-		},
-		{
-			sysName:    "MACHINE_NEW",
-			inputsStr:  "label string, addr string, program any",
-			outputsStr: "machineID int",
-			synthetic:  true,
-		},
-		{
-			sysName:   "MACHINE_STOP",
-			inputsStr: "machineID int, graceful bool",
-			synthetic: true,
-		},
-		{
-			sysName:   "MACHINE_INODE_INFO",
-			inputsStr: "machineID int, inodeID int, info *fs.InodeInfo",
-			synthetic: true,
-		},
-		{
-			sysName:   "MACHINE_WAIT",
-			inputsStr: "machineID int",
-			async:     true,
-			synthetic: true,
-		},
-		{
-			sysName:    "MACHINE_RECOVER_INIT",
-			inputsStr:  "machineID int, program any",
-			outputsStr: "iterID int",
-			synthetic:  true,
-		},
-		{
-			sysName:    "MACHINE_RECOVER_NEXT",
-			inputsStr:  "iterID int",
-			outputsStr: "machineID int, ok bool",
-			synthetic:  true,
-		},
-		{
-			sysName:    "MACHINE_RECOVER_RELEASE",
-			inputsStr:  "iterID int",
-			outputsStr: "",
-			synthetic:  true,
-		},
-		{
-			sysName:    "MACHINE_RESTART",
-			inputsStr:  "machineID int, partialDisk bool",
-			outputsStr: "err error",
-			synthetic:  true,
-		},
-		{
-			sysName:    "MACHINE_GET_LABEL",
-			inputsStr:  "machineID int",
-			outputsStr: "label string, err error",
-			synthetic:  true,
-		},
-		{
-			sysName:    "MACHINE_SET_BOOT_PROGRAM",
-			inputsStr:  "machineID int, program any",
-			outputsStr: "err error",
-			synthetic:  true,
-		},
-		{
-			sysName:    "MACHINE_SET_SOMETIMES_CRASH_ON_SYNC",
-			inputsStr:  "machineID int, crash bool",
-			outputsStr: "err error",
-			synthetic:  true,
-		},
-	}
-
-	writeSyscalls(path.Join(rootDir, "internal/simulation/gosim_gensyscall.go"), machineCalls, true)
+	writeSyscalls(path.Join(rootDir, "internal/simulation/gosim_gensyscall.go"), machineCalls, nil, true)
 }
