@@ -178,7 +178,7 @@ func Runtime(fun func()) {
 	go s.network.Run()
 
 	addr := s.network.NextIP()
-	s.main = s.newMachine("main", addr, fs.NewFilesystem(), fun)
+	s.main = s.newMachine("main", addr, fs.NewLinuxFilesystem(), fun)
 	s.startMachine(s.main)
 
 	dispatcher.Run()

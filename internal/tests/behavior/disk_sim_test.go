@@ -5,6 +5,7 @@ package behavior_test
 import (
 	"errors"
 	"os"
+	"strings"
 	"syscall"
 	"testing"
 
@@ -177,3 +178,21 @@ func TestDiskGC(t *testing.T) {
 // TODO: test delete using unlink
 // TODO: test no delete until close, then delete
 // TODO: test no delete until flush, then delete
+
+func TestDiskInitial(t *testing.T) {
+	dir, err := os.Getwd()
+	if err != nil {
+		t.Errorf("getwd: %s", err)
+	}
+	if dir != "/app" {
+		t.Errorf("bad initial path: expected /app, got %s", dir)
+	}
+
+	hosts, err := os.ReadFile("/etc/hosts")
+	if err != nil {
+		t.Errorf("read /etc/hosts: %s", err)
+	}
+	if !strings.Contains(string(hosts), "localhost") {
+		t.Errorf("bad /etc/hosts %q, does not contain localhost", string(hosts))
+	}
+}

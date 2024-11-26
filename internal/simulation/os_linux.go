@@ -42,6 +42,12 @@ type LinuxOS struct {
 }
 
 func NewLinuxOS(simulation *Simulation, machine *Machine, dispatcher syscallabi.Dispatcher) *LinuxOS {
+	// TODO: initialize the working directory more elegantly
+	workdirInode, err := machine.filesystem.Getdirinode(fs.RootInode, "/app")
+	if err != nil {
+		panic(err)
+	}
+
 	return &LinuxOS{
 		dispatcher: dispatcher,
 
@@ -54,7 +60,7 @@ func NewLinuxOS(simulation *Simulation, machine *Machine, dispatcher syscallabi.
 
 		mmaps: make(map[uintptr]*fs.Mmap),
 
-		workdirInode: fs.RootInode,
+		workdirInode: workdirInode,
 	}
 }
 

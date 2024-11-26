@@ -220,7 +220,7 @@ type fsOp interface {
 	String() string
 }
 
-func inititalState() *filesystemState {
+func emptyState() *filesystemState {
 	return &filesystemState{
 		objects: map[int]any{
 			RootInode: &backingDir{
@@ -233,14 +233,62 @@ func inititalState() *filesystemState {
 	}
 }
 
-func NewFilesystem() *Filesystem {
+func linuxState() *filesystemState {
+	// TODO: make this initialization less ugly
+	return &filesystemState{
+		objects: map[int]any{
+			RootInode: &backingDir{
+				inode:  RootInode,
+				parent: RootInode,
+				entries: map[string]int{
+					"etc": 2,
+					"app": 4,
+				},
+			},
+			2: &backingDir{
+				inode:  2,
+				parent: RootInode,
+				name:   "etc",
+				entries: map[string]int{
+					"hosts": 3,
+				},
+			},
+			3: &backingFile{
+				inode: 3,
+				file: chunkedFileFromBytes([]byte(`# hosts
+127.0.0.1 localhost
+`)),
+				linkCount: 1,
+			},
+			4: &backingDir{
+				inode:   4,
+				parent:  RootInode,
+				name:    "app",
+				entries: make(map[string]int),
+			},
+		},
+		next: 5,
+	}
+}
+
+func newFilesystem(initialState *filesystemState) *Filesystem {
+	persisted := initialState
+	mem := persisted.clone()
 	return &Filesystem{
 		pendingOps:          newPendingOps(),
-		mem:                 inititalState(),
-		persisted:           inititalState(),
+		mem:                 mem,
+		persisted:           persisted,
 		openCountByInode:    make(map[int]int),
 		pendingCountByInode: make(map[int]int),
 	}
+}
+
+func NewEmptyFilesystem() *Filesystem {
+	return newFilesystem(emptyState())
+}
+
+func NewLinuxFilesystem() *Filesystem {
+	return newFilesystem(linuxState())
 }
 
 func (fs *filesystemState) getFile(idx int) *backingFile {

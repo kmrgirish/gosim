@@ -62,6 +62,22 @@ var chunkPool = sync.Pool{
 	},
 }
 
+func chunkedFileFromBytes(data []byte) *chunkedFile {
+	chunks := make([]*refCountedChunk, 0, (len(data)+chunkSize-1)/chunkSize)
+	tail := data
+	for len(tail) > 0 {
+		chunk := allocRefCountedChunk()
+		chunk.refs = 1
+		n := copy(chunk.data, tail)
+		tail = tail[n:]
+		chunks = append(chunks, chunk)
+	}
+	return &chunkedFile{
+		chunks: chunks,
+		size:   len(data),
+	}
+}
+
 func allocRefCountedChunk() *refCountedChunk {
 	chunk := chunkPool.Get().(*refCountedChunk)
 	if chunk.refs != 0 {

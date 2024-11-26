@@ -51,7 +51,7 @@ func (g *GosimOS) MachineNew(label string, addrStr string, program any, invocati
 
 	bootProgram := program.(func())
 
-	machine := g.simulation.newMachine(label, addr, fs.NewFilesystem(), bootProgram)
+	machine := g.simulation.newMachine(label, addr, fs.NewLinuxFilesystem(), bootProgram)
 
 	// TODO: don't start machine???
 	g.simulation.startMachine(machine)
