@@ -17,10 +17,10 @@ An interesting and entertaining introduction to simulation testing is the talk
 
 Gosim is an experimental project. Feedback, suggestions, and ideas are all very
 welcome. The underlying design feels quite solid, but the implemented and
-simulated APIs are still limited: files work, but not directories; TCP works,
-but not UDP; IP addresses work, but not hostnames. The API can and will change.
-Now that those warnings are out of the way, please take a look at what gosim
-can do.
+simulated APIs are still limited: files and directories work, but no permissions
+or links; TCP works, but not UDP; IP addresses work, but not hostnames. The API
+can and will change. Now that those warnings are out of the way, please take a
+look at what gosim can do.
 
 # Using Gosim
 
