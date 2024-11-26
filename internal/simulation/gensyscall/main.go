@@ -793,7 +793,7 @@ func formatSysnums(sysnums map[string]int) string {
 	}
 
 	return fmt.Sprintf(`
-	
+
 func SyscallName(trap uintptr) string {
 	switch trap {
 		%s
