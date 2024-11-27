@@ -42,7 +42,7 @@ type runConfig struct {
 // Copied in metatesting.RunResult. Keep in sync.
 type runResult struct {
 	Seed      int64
-	Trace     []byte
+	Checksum  []byte
 	Failed    bool
 	LogOutput []byte
 	Err       string // TODO: reconsider this type?
@@ -172,7 +172,7 @@ func TestMain(rt Runtime) {
 
 		metaResult := runResult{
 			Seed:      result.Seed,
-			Trace:     result.Trace,
+			Checksum:  result.Checksum,
 			Failed:    result.Failed,
 			LogOutput: result.LogOutput,
 		}

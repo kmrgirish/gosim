@@ -6,35 +6,35 @@ import (
 	"log/slog"
 )
 
-type tracer struct {
+type checksummer struct {
 	step   int
 	hash   fnv64
 	logger *slog.Logger
 }
 
-func newTracer(logger *slog.Logger) *tracer {
-	return &tracer{
+func newChecksummer(logger *slog.Logger) *checksummer {
+	return &checksummer{
 		step:   0,
 		hash:   newFnv64(),
 		logger: logger,
 	}
 }
 
-//go:generate go run golang.org/x/tools/cmd/stringer -type=traceKey
+//go:generate go run golang.org/x/tools/cmd/stringer -type=checksumKey
 
-type traceKey byte
+type checksumKey byte
 
 const (
-	traceKeyRunPick traceKey = iota
-	tracekeyRunResult
-	tracekeyLogWrite
-	traceKeyCreating
-	traceKeyRunStarted
-	traceKeyRunFinished
-	traceKeyTimeNow
+	checksumKeyRunPick checksumKey = iota
+	checksumKeyRunResult
+	checksumKeyLogWrite
+	checksumKeyCreating
+	checksumKeyRunStarted
+	checksumKeyRunFinished
+	checksumKeyTimeNow
 )
 
-func (t *tracer) recordIntInt(key traceKey, a, b uint64) {
+func (t *checksummer) recordIntInt(key checksumKey, a, b uint64) {
 	if inControlledNondeterminism() {
 		panic("help")
 	}
@@ -44,11 +44,11 @@ func (t *tracer) recordIntInt(key traceKey, a, b uint64) {
 	t.hash.HashInt(b)
 
 	level := slog.LevelDebug
-	if *forceTrace {
+	if *forceChecksum {
 		level = slog.LevelError
 	}
 	if t.logger.Enabled(context.TODO(), level) {
-		t.logger.LogAttrs(context.TODO(), level, "dettrace",
+		t.logger.LogAttrs(context.TODO(), level, "checksummer",
 			slog.Int("step", t.step),
 			slog.String("key", key.String()),
 			slog.Int("a", int(a)),
@@ -58,7 +58,7 @@ func (t *tracer) recordIntInt(key traceKey, a, b uint64) {
 	t.step++
 }
 
-func (t *tracer) recordBytes(key traceKey, a []byte) {
+func (t *checksummer) recordBytes(key checksumKey, a []byte) {
 	if inControlledNondeterminism() {
 		panic("help")
 	}
@@ -67,11 +67,11 @@ func (t *tracer) recordBytes(key traceKey, a []byte) {
 	t.hash.Hash(a)
 
 	level := slog.LevelDebug
-	if *forceTrace {
+	if *forceChecksum {
 		level = slog.LevelError
 	}
 	if t.logger.Enabled(context.TODO(), level) {
-		t.logger.LogAttrs(context.TODO(), level, "dettrace",
+		t.logger.LogAttrs(context.TODO(), level, "checksummer",
 			slog.Int("step", t.step),
 			slog.String("key", key.String()),
 			slog.String("a", string(a)),
@@ -80,17 +80,17 @@ func (t *tracer) recordBytes(key traceKey, a []byte) {
 	t.step++
 }
 
-func (t *tracer) finalize() []byte {
+func (t *checksummer) finalize() []byte {
 	var n [8]byte
 	binary.LittleEndian.PutUint64(n[:], uint64(t.hash))
 	return n[:]
 }
 
-type traceWriter struct {
-	trace *tracer
+type checksumWriter struct {
+	checksummer *checksummer
 }
 
-func (t traceWriter) Write(p []byte) (n int, err error) {
-	t.trace.recordBytes(tracekeyLogWrite, p)
+func (t checksumWriter) Write(p []byte) (n int, err error) {
+	t.checksummer.recordBytes(checksumKeyLogWrite, p)
 	return len(p), nil
 }

@@ -13,8 +13,8 @@ import (
 )
 
 var (
-	logLevel   = flag.String("log-level", "ERROR", "gosim slog log level")
-	forceTrace = flag.Bool("force-trace", false, "gosim force trace logging")
+	logLevel      = flag.String("log-level", "ERROR", "gosim slog log level")
+	forceChecksum = flag.Bool("force-checksum", false, "gosim force reproducibility checksumming and logging")
 )
 
 type logger struct {

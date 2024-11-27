@@ -36,7 +36,7 @@ type RunConfig struct {
 // A RunResult contains the result fo a test run.
 type RunResult struct {
 	Seed      int64
-	Trace     []byte
+	Checksum  []byte
 	Failed    bool
 	LogOutput []byte
 	Err       string // TODO: reconsider this type?
@@ -279,8 +279,8 @@ func CheckDeterministic(t *testing.T, mt *MetaT) {
 				t.Fatal(err)
 			}
 
-			if !bytes.Equal(run1.Trace, run2.Trace) {
-				slog.Error("traces differ: non-determinism found")
+			if !bytes.Equal(run1.Checksum, run2.Checksum) {
+				slog.Error("checksums differ: non-determinism found")
 				t.Fail()
 				// XXX debug view?
 			}

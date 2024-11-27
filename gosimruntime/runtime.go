@@ -100,7 +100,7 @@ type scheduler struct {
 
 	current atomicValue[*goroutine]
 
-	tracer *tracer
+	checksummer *checksummer
 
 	fastrander fastrander
 
@@ -118,7 +118,7 @@ type scheduler struct {
 	inupcall bool
 }
 
-func newScheduler(seed int64, logger logger, tracer *tracer, extraenv []string) *scheduler {
+func newScheduler(seed int64, logger logger, checksummer *checksummer, extraenv []string) *scheduler {
 	clock := newClock()
 
 	rand := mathrand.New(mathrand.NewSource(seed))
@@ -132,7 +132,7 @@ func newScheduler(seed int64, logger logger, tracer *tracer, extraenv []string) 
 		clock:           clock,
 		nextEventID:     1,
 		logger:          logger,
-		tracer:          tracer,
+		checksummer:     checksummer,
 		globaltoken:     MakeRaceToken(),
 		envs: append(extraenv,
 			"GOSIM_LOG_LEVEL="+logger.level.String(),
@@ -264,13 +264,13 @@ func (s *scheduler) Run() error {
 
 		pick := s.runnable[s.fastrander.fastrandn(uint32(len(s.runnable)))]
 
-		if s.tracer != nil {
-			s.tracer.recordIntInt(traceKeyRunPick, uint64(pick.ID), uint64(s.fastrander.state))
+		if s.checksummer != nil {
+			s.checksummer.recordIntInt(checksumKeyRunPick, uint64(pick.ID), uint64(s.fastrander.state))
 		}
 		s.current.set(pick)
 		pick.step()
 		s.current.set(nil)
-		if s.tracer != nil {
+		if s.checksummer != nil {
 			var flags uint64
 			if pick.finished {
 				flags |= 1
@@ -278,7 +278,7 @@ func (s *scheduler) Run() error {
 			if pick.waiting {
 				flags |= 1 << 1
 			}
-			s.tracer.recordIntInt(tracekeyRunResult, flags, s.fastrander.state)
+			s.checksummer.recordIntInt(checksumKeyRunResult, flags, s.fastrander.state)
 		}
 		if pick.finished {
 			s.removeGoroutine(pick)
@@ -324,18 +324,18 @@ func initializeRuntime(rt func(func())) {
 
 type internalRunResult struct {
 	Seed      int64
-	Trace     []byte
+	Checksum  []byte
 	Failed    bool
 	LogOutput []byte
 	Err       error
 }
 
-func run(f func(), seed int64, enableTracer bool, captureLog bool, logLevelOverride string, simLogger io.Writer, extraenv []string) internalRunResult {
+func run(f func(), seed int64, enableChecksum bool, captureLog bool, logLevelOverride string, simLogger io.Writer, extraenv []string) internalRunResult {
 	if !runtimeInitialized {
 		panic("not yet initialized")
 	}
 
-	enableTracer = enableTracer || *forceTrace
+	enableChecksum = enableChecksum || *forceChecksum
 
 	logLevelStr := *logLevel
 	if logLevelOverride != "" {
@@ -355,14 +355,14 @@ func run(f func(), seed int64, enableTracer bool, captureLog bool, logLevelOverr
 
 	logger := makeLogger(logOut, logLevel)
 
-	var tracer *tracer
-	if enableTracer {
-		tracer = newTracer(logger.slog)
-		logOut = io.MultiWriter(&traceWriter{trace: tracer}, logger.out)
+	var checksummer *checksummer
+	if enableChecksum {
+		checksummer = newChecksummer(logger.slog)
+		logOut = io.MultiWriter(&checksumWriter{checksummer: checksummer}, logger.out)
 		logger = makeLogger(logOut, logLevel)
 	}
 
-	scheduler := newScheduler(seed, logger, tracer, extraenv)
+	scheduler := newScheduler(seed, logger, checksummer, extraenv)
 	defer setgs(scheduler)()
 
 	InitSteps()
@@ -375,19 +375,19 @@ func run(f func(), seed int64, enableTracer bool, captureLog bool, logLevelOverr
 	}
 
 	scheduler.Go(wrapper, defaultMachine, scheduler.globaltoken)
-	if enableTracer {
+	if enableChecksum {
 		// XXX: add a top-level force-trace flag
 		// XXX: this flag is kinda sad... reorg?
-		tracer.recordIntInt(traceKeyRunStarted, 0, 0)
+		checksummer.recordIntInt(checksumKeyRunStarted, 0, 0)
 	}
 	runErr := scheduler.Run()
 	if runErr == ErrMainReturned {
 		runErr = nil
 	}
-	var trace []byte
-	if enableTracer {
-		tracer.recordIntInt(traceKeyRunFinished, 0, 0)
-		trace = tracer.finalize()
+	var checksum []byte
+	if enableChecksum {
+		checksummer.recordIntInt(checksumKeyRunFinished, 0, 0)
+		checksum = checksummer.finalize()
 	}
 	var capturedLog []byte
 	if captureLog {
@@ -395,7 +395,7 @@ func run(f func(), seed int64, enableTracer bool, captureLog bool, logLevelOverr
 	}
 	return internalRunResult{
 		Seed:      seed,
-		Trace:     trace,
+		Checksum:  checksum,
 		Failed:    runErr != nil, // TODO: get rid of Failed or Err?
 		LogOutput: capturedLog,
 		Err:       runErr,
@@ -507,8 +507,8 @@ func newGoroutine(id int, parent *goroutine, spawnEventID int, fun func(), machi
 	g.machine = machine
 	g.parksynctoken = MakeRaceToken()
 
-	if gs.tracer != nil {
-		gs.tracer.recordIntInt(traceKeyCreating, uint64(g.ID), uint64(relativeFuncAddr(fun))) // XXX: test this pointer
+	if gs.checksummer != nil {
+		gs.checksummer.recordIntInt(checksumKeyCreating, uint64(g.ID), uint64(relativeFuncAddr(fun))) // XXX: test this pointer
 	}
 
 	prev := getg()

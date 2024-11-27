@@ -60,8 +60,8 @@ func (c *clock) doadvance() {
 	}
 	// XXX: we allow adding at now/earlier to handle instant timers
 	c.now = t
-	if tracer := gs.get().tracer; tracer != nil {
-		tracer.recordIntInt(traceKeyTimeNow, uint64(c.now), 0)
+	if checksummer := gs.get().checksummer; checksummer != nil {
+		checksummer.recordIntInt(checksumKeyTimeNow, uint64(c.now), 0)
 	}
 }
 
