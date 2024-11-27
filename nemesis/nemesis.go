@@ -78,6 +78,7 @@ func (p PartitionMachines) Run() {
 	var a, b []string
 
 	for {
+		a, b = nil, nil
 		for _, addr := range p.Addresses {
 			if rand.Intn(2) == 0 {
 				a = append(a, addr)
