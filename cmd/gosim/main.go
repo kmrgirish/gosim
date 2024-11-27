@@ -228,6 +228,7 @@ func main() {
 		race := testflags.Bool("race", false, "build in -race mode")
 		run := testflags.String("run", "", "tests to run (as in go test -run)")
 		logformat := testflags.String("logformat", "pretty", "gosim log formatting: raw|indented|pretty")
+		simtrace := testflags.String("simtrace", "", "set of a comma-separated traces to enable")
 		testflags.Parse(cmdArgs)
 
 		cfg.Race = *race
@@ -264,6 +265,9 @@ func main() {
 		if *logformat != "pretty" {
 			// TODO: configure this default somewhere?
 			args = append(args, "-logformat", *logformat)
+		}
+		if *simtrace != "" {
+			args = append(args, "-simtrace", *simtrace)
 		}
 
 		cmd := exec.Command(name, args...)

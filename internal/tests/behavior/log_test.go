@@ -7,6 +7,7 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"syscall"
 	"testing"
 	"time"
 
@@ -82,4 +83,14 @@ func TestLogDuringInit(t *testing.T) {
 		Label:    "logm",
 		MainFunc: func() {},
 	}).Wait()
+}
+
+func TestLogTraceSyscall(t *testing.T) {
+	// should print ENOSYS
+	syscall.Syscall(9999, 0, 0, 0)
+
+	// should print open, write, close
+	if err := os.WriteFile("hello", []byte("world"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 }

@@ -75,11 +75,8 @@ func (l *LinuxOS) doShutdown() {
 	l.files = nil
 }
 
-// XXX: var causes init issues????
-const logEnabled = false
-
 func logf(fmt string, args ...any) {
-	if logEnabled && logInitialized {
+	if logInitialized && gosimruntime.TraceSyscall.Enabled() {
 		log.Printf(fmt, args...)
 	}
 }

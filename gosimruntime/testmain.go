@@ -34,6 +34,7 @@ type runConfig struct {
 	Test     string
 	Seed     int64
 	ExtraEnv []string
+	Simtrace string
 }
 
 // Copied in metatesting.RunResult. Keep in sync.
@@ -51,6 +52,8 @@ type Runtime interface {
 	TestEntrypoint(match string, skip string, tests []Test) bool
 }
 
+var simtrace = flag.String("simtrace", "", "set of comma-separated traces to enable")
+
 func TestMain(rt Runtime) {
 	flag.Parse()
 
@@ -62,6 +65,10 @@ func TestMain(rt Runtime) {
 		// parallel := flag.Lookup("test.parallel").Value.(flag.Getter).Get().(int)
 		match := flag.Lookup("test.run").Value.(flag.Getter).Get().(string)
 		skip := flag.Lookup("test.skip").Value.(flag.Getter).Get().(string)
+
+		if err := parseTraceflagsConfig(*simtrace); err != nil {
+			log.Fatal(err)
+		}
 
 		seed := int64(1)
 		enableTracer := true
@@ -105,7 +112,9 @@ func TestMain(rt Runtime) {
 
 		// TODO: add "listtests" as a separate message type?
 		if req.Test == "listtests" {
-			out.Encode(slices.Sorted(maps.Keys(allTests)))
+			if err := out.Encode(slices.Sorted(maps.Keys(allTests))); err != nil {
+				log.Fatal(err)
+			}
 			continue
 		}
 
@@ -114,34 +123,42 @@ func TestMain(rt Runtime) {
 		captureLog := true
 		logLevelOverride := "INFO"
 
-		func() {
-			result := run(func() {
-				// TODO: add an entrypoint that takes a single test?
-				// TODO: fail gracefully with non-existent tests?
-				ok := rt.TestEntrypoint(req.Test, "", []Test{
-					{
-						Name: req.Test,
-						Test: allTests[req.Test],
-					},
-				})
-				if !ok {
-					SetAbortError(ErrTestFailed)
-				}
-			}, seed, enableTracer, captureLog, logLevelOverride, makeConsoleLogger(os.Stderr), req.ExtraEnv)
-
+		if err := parseTraceflagsConfig(req.Simtrace); err != nil {
 			metaResult := runResult{
-				Seed:      result.Seed,
-				Trace:     result.Trace,
-				Failed:    result.Failed,
-				LogOutput: result.LogOutput,
+				Err: err.Error(),
 			}
-			if result.Err != nil {
-				metaResult.Err = result.Err.Error()
-			}
-
 			if err := out.Encode(metaResult); err != nil {
 				log.Fatal(err)
 			}
-		}()
+			continue
+		}
+
+		result := run(func() {
+			// TODO: add an entrypoint that takes a single test?
+			// TODO: fail gracefully with non-existent tests?
+			ok := rt.TestEntrypoint(req.Test, "", []Test{
+				{
+					Name: req.Test,
+					Test: allTests[req.Test],
+				},
+			})
+			if !ok {
+				SetAbortError(ErrTestFailed)
+			}
+		}, seed, enableTracer, captureLog, logLevelOverride, makeConsoleLogger(os.Stderr), req.ExtraEnv)
+
+		metaResult := runResult{
+			Seed:      result.Seed,
+			Trace:     result.Trace,
+			Failed:    result.Failed,
+			LogOutput: result.LogOutput,
+		}
+		if result.Err != nil {
+			metaResult.Err = result.Err.Error()
+		}
+
+		if err := out.Encode(metaResult); err != nil {
+			log.Fatal(err)
+		}
 	}
 }

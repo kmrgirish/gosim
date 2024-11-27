@@ -31,6 +31,7 @@ type RunConfig struct {
 	Test     string
 	Seed     int64
 	ExtraEnv []string
+	Simtrace string
 }
 
 // A RunResult contains the result fo a test run.

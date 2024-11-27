@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/jellevandenhooff/gosim/internal/race"
 	"github.com/jellevandenhooff/gosim/metatesting"
 )
 
@@ -117,6 +118,49 @@ func TestLogDuringInit(t *testing.T) {
 `))
 
 	if diff := cmp.Diff(expected, actual); diff != "" {
+		t.Error("diff", diff)
+	}
+}
+
+func TestLogTraceSyscall(t *testing.T) {
+	if race.Enabled {
+		// TODO: repair, which will need a reasonable plan for printing data
+		// buffers using syscallabi API.
+		t.Skip("logging arguments causes race")
+	}
+
+	mt := metatesting.ForCurrentPackage(t)
+
+	// no logs without simtrace
+	run, err := mt.Run(t, &metatesting.RunConfig{
+		Test: "TestLogTraceSyscall",
+		Seed: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff(metatesting.SimplifyParsedLog(metatesting.ParseLog(run.LogOutput)), []string(nil)); diff != "" {
+		t.Error("diff", diff)
+	}
+
+	// syscalls with simtrace
+	run, err = mt.Run(t, &metatesting.RunConfig{
+		Test:     "TestLogTraceSyscall",
+		Seed:     1,
+		Simtrace: "syscall",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// TODO: support snapshotting these logs?
+	// TODO: include machine etc.?
+	if diff := cmp.Diff(metatesting.SimplifyParsedLog(metatesting.ParseLog(run.LogOutput)), []string{
+		"INFO unsupported syscall unknown (9999) 0 0 0 0 0 0",
+		"INFO openat -100 hello 577 420",
+		`INFO write 5 5 {"world"}`,
+		"INFO close 5",
+	}); diff != "" {
 		t.Error("diff", diff)
 	}
 }
