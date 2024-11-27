@@ -3,6 +3,7 @@ package gosimruntime
 import (
 	"encoding/json"
 	"flag"
+	"io"
 	"log"
 	"maps"
 	"os"
@@ -167,7 +168,7 @@ func TestMain(rt Runtime) {
 			if !ok {
 				SetAbortError(ErrTestFailed)
 			}
-		}, seed, enableTracer, captureLog, logLevelOverride, makeConsoleLogger(os.Stderr), req.ExtraEnv)
+		}, seed, enableTracer, captureLog, logLevelOverride, io.Discard, req.ExtraEnv)
 
 		metaResult := runResult{
 			Seed:      result.Seed,

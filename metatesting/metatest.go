@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"log/slog"
 	"os"
@@ -54,10 +53,12 @@ type MetaT struct {
 	r *json.Decoder
 }
 
-/*
-type indenter struct{}
+type prefixer struct {
+	out    *os.File
+	prefix string
+}
 
-func (w indenter) Write(b []byte) (n int, err error) {
+func (w prefixer) Write(b []byte) (n int, err error) {
 	n = len(b)
 	for len(b) > 0 {
 		end := bytes.IndexByte(b, '\n')
@@ -66,22 +67,16 @@ func (w indenter) Write(b []byte) (n int, err error) {
 		} else {
 			end++
 		}
-		// An indent of 4 spaces will neatly align the dashes with the status
-		// indicator of the parent.
 		line := b[:end]
-		// if line[0] == marker {
-		// w.c.output = append(w.c.output, marker)
-		// line = line[1:]
-		// }
-		const indent = "    "
-		fmt.Fprintf(os.Stderr, "%s%s", indent, line)
-		// w.c.output = append(w.c.output, indent...)
-		// w.c.output = append(w.c.output, line...)
+		w.out.WriteString(w.prefix)
+		w.out.Write(line)
+		if line[len(line)-1] != '\n' {
+			w.out.WriteString("\n")
+		}
 		b = b[end:]
 	}
 	return
 }
-*/
 
 func newRunner(path string) (*MetaT, error) {
 	cmd := exec.Command(path, "-metatest")
@@ -96,7 +91,7 @@ func newRunner(path string) (*MetaT, error) {
 
 	// TODO: Do not discard, and disable the formatted output print in gosimruntime instead
 	// TODO: Prefix output to help identify stray logging?
-	cmd.Stderr = io.Discard // os.Stderr
+	cmd.Stderr = &prefixer{out: os.Stderr, prefix: "metatest binary: "}
 
 	if err := cmd.Start(); err != nil {
 		return nil, err
