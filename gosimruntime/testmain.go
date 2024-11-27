@@ -7,6 +7,7 @@ import (
 	"maps"
 	"os"
 	"slices"
+	"strings"
 )
 
 type Test struct {
@@ -54,6 +55,20 @@ type Runtime interface {
 
 var simtrace = flag.String("simtrace", "", "set of comma-separated traces to enable")
 
+// subset of flags defined by the testing package that we parse
+// and support.
+var supportedFlags = map[string]bool{
+	// supported:
+	"test.run":  true,
+	"test.skip": true,
+
+	// not supported but (hopefully) harmless to ignore:
+	"test.paniconexit0": true,
+	"test.testlogfile":  true,
+	"test.timeout":      true,
+	"test.v":            true,
+}
+
 func TestMain(rt Runtime) {
 	flag.Parse()
 
@@ -61,10 +76,17 @@ func TestMain(rt Runtime) {
 	initializeRuntime(rt.Run)
 
 	if !*metatest {
-		// TODO: complain about unsupported test flags
 		// parallel := flag.Lookup("test.parallel").Value.(flag.Getter).Get().(int)
 		match := flag.Lookup("test.run").Value.(flag.Getter).Get().(string)
 		skip := flag.Lookup("test.skip").Value.(flag.Getter).Get().(string)
+
+		// guard against unknown "test." flags showing up. Since we replace the
+		// testing implementation, flags will (likely) not work as expected.
+		flag.CommandLine.Visit(func(f *flag.Flag) {
+			if strings.HasPrefix(f.Name, "test.") && !supportedFlags[f.Name] {
+				log.Fatalf("flag %s is not supported by gosim", f.Name)
+			}
+		})
 
 		if err := parseTraceflagsConfig(*simtrace); err != nil {
 			log.Fatal(err)
