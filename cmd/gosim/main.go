@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	"github.com/jellevandenhooff/gosim/internal/gosimtool"
+	"github.com/jellevandenhooff/gosim/internal/gosimviewer"
 	"github.com/jellevandenhooff/gosim/internal/translate"
 )
 
@@ -348,6 +349,15 @@ func main() {
 				}
 			}
 		}
+
+	case "viewer":
+		// TODO: document viewer
+		viewerflags := flag.NewFlagSet(commandName("viewer"), flag.ExitOnError)
+		// TODO: make this log viewing experience nicer
+		log := viewerflags.String("log", "", "path to logs from jsonlogout")
+		viewerflags.Parse(cmdArgs)
+
+		gosimviewer.Viewer(*log)
 
 	case "debug":
 		// TODO: make -headless flag write launch configuration?

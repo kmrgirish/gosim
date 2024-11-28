@@ -1,0 +1,54 @@
+<html>
+<head>
+<title>gosim log viewer</title>
+<script src="https://unpkg.com/htmx.org@2.0.3/dist/htmx.js" integrity="sha384-BBDmZzVt6vjz5YbQqZPtFZW82o8QotoM7RUp5xOxV3nSJ8u2pSdtzFAbGKzTlKtg" crossorigin="anonymous"></script>
+<style>
+.selected {
+    background-color: #F37736;
+}
+.tooltip {
+    display: none;
+    position: absolute;
+    background: white;
+    z-index: 1000;
+    padding: .1em;
+    left: 105%;
+}
+a {
+    position: relative;
+}
+a:hover .tooltip {
+    display: block;
+}
+</style>
+</head>
+<body>
+<div style="display: flex; overflow: hide; height: 100%">
+    <div style="width: 50%; overflow: scroll">
+        <pre style="text-wrap: auto;">
+{{ range .Logs }}<span hx-get="/stack?index={{ .Index }}" hx-trigger="click consume" hx-target="#stack">{{ .Step }} {{ .Machine }}/{{ .Goroutine }} {{.Time | Time }} {{ .Level }} {{ .Source | Source }} > {{ .Msg }}</span>
+{{ end }}
+        </pre>
+    </div>
+    <div style="width: 50%; display: flex; flex-direction: column;">
+        <div id="source" style="height: 50%; overflow: scroll">
+        </div>
+        <div id="stack" style="height: 50%; overflow: scroll">
+        </div>
+    </div>
+</div>
+<script>
+var curFile = undefined;
+function scrollTo(file, line) {
+    var element = document.getElementById("L"+line);
+    var newFile = file;
+    if (newFile !== curFile) {
+        curFile = newFile;
+        element.scrollIntoView({block: "center"});
+    } else {
+        element.scrollIntoViewIfNeeded({block: "center"});
+    }
+}
+</script>
+</body>
+</html>

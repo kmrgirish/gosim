@@ -1,0 +1,2 @@
+<a href="#" hx-get="viewer?file={{ .File }}&line={{ .Line }}" hx-trigger="click consume" hx-target="#source"
+    hx-on::after-swap="scrollTo({{ .File }}, {{ .Line }})"><span class="tooltip">{{ .File }}</span>{{ .ShortFile }}:{{ .Line }}</a>
