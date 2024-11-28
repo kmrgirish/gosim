@@ -180,6 +180,7 @@ func main() {
 		run := testflags.String("run", "", "tests to run (as in go test -run)")
 		logformat := testflags.String("logformat", "pretty", "gosim log formatting: raw|indented|pretty")
 		simtrace := testflags.String("simtrace", "", "set of a comma-separated traces to enable")
+		jsonlogout := testflags.String("jsonlogout", "", "path to a file to write json log to, for use with viewer")
 		testflags.Parse(cmdArgs)
 
 		cfg.Race = *race
@@ -219,6 +220,14 @@ func main() {
 		}
 		if *simtrace != "" {
 			args = append(args, "-simtrace", *simtrace)
+		}
+		// TODO: make this output somehow work per test
+		if *jsonlogout != "" {
+			abs, err := filepath.Abs(*jsonlogout)
+			if err != nil {
+				log.Fatalf("making jsonlogout absolute: %s", err)
+			}
+			args = append(args, "-jsonlogout", abs)
 		}
 
 		cmd := exec.Command(name, args...)
