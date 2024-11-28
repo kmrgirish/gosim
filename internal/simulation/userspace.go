@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jellevandenhooff/gosim/gosimruntime"
+	"github.com/jellevandenhooff/gosim/internal/gosimlog"
 )
 
 // Per-machine globals initialized in setupUserspace:
@@ -33,6 +34,9 @@ func (w gosimSlogHandler) Enabled(ctx context.Context, level slog.Level) bool {
 func (w gosimSlogHandler) Handle(ctx context.Context, r slog.Record) error {
 	r.AddAttrs(slog.Int("goroutine", gosimruntime.GetGoroutine()))
 	r.AddAttrs(slog.Int("step", gosimruntime.Step()))
+	if gosimruntime.TraceStack.Enabled() {
+		r.AddAttrs(gosimlog.Stack(0, r.PC))
+	}
 	return w.inner.Handle(ctx, r)
 }
 

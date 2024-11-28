@@ -2,6 +2,8 @@ package gosimruntime
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 )
 
@@ -23,12 +25,20 @@ func (t *TraceFlag) Enabled() bool {
 
 var traceflags map[string]*TraceFlag
 
-var TraceSyscall TraceFlag
+var (
+	TraceSyscall TraceFlag
+	TraceStack   TraceFlag
+)
 
 func init() {
 	traceflags = map[string]*TraceFlag{
 		"syscall": &TraceSyscall,
+		"stack":   &TraceStack,
 	}
+}
+
+func knownTraceflags() string {
+	return strings.Join(slices.Sorted(maps.Keys(traceflags)), ",")
 }
 
 func parseTraceflagsConfig(config string) error {
@@ -44,7 +54,7 @@ func parseTraceflagsConfig(config string) error {
 
 		flag, ok := traceflags[name]
 		if !ok {
-			return fmt.Errorf("unknown traceflag %q", name)
+			return fmt.Errorf("unknown traceflag %q (known %s)", name, knownTraceflags())
 		}
 		flag.set(true)
 	}

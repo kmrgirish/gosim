@@ -11,6 +11,9 @@ import (
 	"testing"
 	"time"
 
+	zapslog "github.com/tommoulard/zap-slog"
+	"go.uber.org/zap"
+
 	"github.com/jellevandenhooff/gosim"
 )
 
@@ -93,4 +96,34 @@ func TestLogTraceSyscall(t *testing.T) {
 	if err := os.WriteFile("hello", []byte("world"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func c(z *zap.Logger) {
+	slog.Info("hello from slog")
+	z.Info("hello from zap")
+}
+
+func b(z *zap.Logger) {
+	c(z)
+}
+
+func a(z *zap.Logger, count int) {
+	if count == 0 {
+		b(z)
+	} else {
+		a(z, count-1)
+	}
+}
+
+func TestLogTraceStacks(t *testing.T) {
+	log.Println("hello from log")
+
+	z, err := zap.NewProduction(zapslog.WrapCore(slog.Default()))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// print some logs with interesting stacks
+	a(z, 0)
+	a(z, 3)
 }

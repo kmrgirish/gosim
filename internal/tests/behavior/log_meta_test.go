@@ -5,10 +5,12 @@ package behavior_test
 import (
 	"bytes"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/jellevandenhooff/gosim/internal/gosimlog"
 	"github.com/jellevandenhooff/gosim/internal/race"
 	"github.com/jellevandenhooff/gosim/metatesting"
 )
@@ -160,6 +162,100 @@ func TestLogTraceSyscall(t *testing.T) {
 		"INFO openat -100 hello 577 420",
 		`INFO write 5 5 {"world"}`,
 		"INFO close 5",
+	}); diff != "" {
+		t.Error("diff", diff)
+	}
+}
+
+type MsgAndStack struct {
+	Msg   string
+	Stack []string
+}
+
+func extractStacksUntilTest(logs []*gosimlog.Log) []MsgAndStack {
+	var all []MsgAndStack
+	for _, log := range logs {
+		msg := log.Msg
+		var stack []string
+		for _, frame := range log.Stackframes {
+			f := frame.Function
+			f = f[strings.LastIndex(f, ".")+1:]
+			stack = append(stack, f)
+			if strings.HasPrefix(f, "ImplTest") {
+				break
+			}
+		}
+		all = append(all, MsgAndStack{
+			Msg:   msg,
+			Stack: stack,
+		})
+	}
+	return all
+}
+
+func TestLogTraceStacks(t *testing.T) {
+	mt := metatesting.ForCurrentPackage(t)
+
+	// no stacks without simtrace stack
+	run, err := mt.Run(t, &metatesting.RunConfig{
+		Test: "TestLogTraceStacks",
+		Seed: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if diff := cmp.Diff(extractStacksUntilTest(gosimlog.ParseLog(run.LogOutput)), []MsgAndStack{
+		{
+			Msg: "hello from log",
+		},
+		{
+			Msg: "hello from slog",
+		},
+		{
+			Msg: "hello from zap",
+		},
+		{
+			Msg: "hello from slog",
+		},
+		{
+			Msg: "hello from zap",
+		},
+	}); diff != "" {
+		t.Error("diff", diff)
+	}
+
+	// stacks with simtrace stack
+	run, err = mt.Run(t, &metatesting.RunConfig{
+		Test:     "TestLogTraceStacks",
+		Seed:     1,
+		Simtrace: "stack",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if diff := cmp.Diff(extractStacksUntilTest(gosimlog.ParseLog(run.LogOutput)), []MsgAndStack{
+		{
+			Msg:   "hello from log",
+			Stack: []string{"ImplTestLogTraceStacks"},
+		},
+		{
+			Msg:   "hello from slog",
+			Stack: []string{"c", "b", "a", "ImplTestLogTraceStacks"},
+		},
+		{
+			Msg:   "hello from zap",
+			Stack: []string{"c", "b", "a", "ImplTestLogTraceStacks"},
+		},
+		{
+			Msg:   "hello from slog",
+			Stack: []string{"c", "b", "a", "a", "a", "a", "ImplTestLogTraceStacks"},
+		},
+		{
+			Msg:   "hello from zap",
+			Stack: []string{"c", "b", "a", "a", "a", "a", "ImplTestLogTraceStacks"},
+		},
 	}); diff != "" {
 		t.Error("diff", diff)
 	}
