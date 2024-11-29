@@ -1,24 +1,16 @@
 <html>
 <head>
 <title>gosim log viewer</title>
-<script src="https://unpkg.com/htmx.org@2.0.3/dist/htmx.js" integrity="sha384-BBDmZzVt6vjz5YbQqZPtFZW82o8QotoM7RUp5xOxV3nSJ8u2pSdtzFAbGKzTlKtg" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.3/dist/htmx.min.js" integrity="sha256-SRlVzRgQdH19e5zLk2QAr7dg4G0l1T5FcrZLZWOyeE4=" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha256-whL0tQWoY1Ku1iskqPFvmZ+CHsvmRWx/PIoEvIeWh4I=" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/tippy.js@6.3.7/dist/tippy.umd.min.js" integrity="sha256-qx7gQMlSzXvTJCl8PBcHyzDQLGvX7NaFbiFY44WpsW4=" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tippy.js@6.3.7/dist/tippy.min.css">
 <style>
 .selected {
     background-color: #F37736;
 }
-.tooltipper {
-    position: relative;
-}
-.tooltip {
-    display: none;
-    position: absolute;
-    background: white;
-    z-index: 1000;
-    padding: .1em;
-    left: 105%;
-}
-.tooltipper:hover .tooltip {
-    display: block;
+a {
+    color: black;
 }
 </style>
 </head>
@@ -69,6 +61,13 @@ function scrollTo(file, line) {
         element.scrollIntoViewIfNeeded({block: "center"});
     }
 }
+htmx.onLoad(function(e) {
+    tippy(e.querySelectorAll('[data-tooltip]'), {
+        duration: 0,
+        maxWidth: "none",
+        content: function(e) { return e.getAttribute('data-tooltip'); },
+    });
+});
 </script>
 </body>
 </html>
