@@ -59,8 +59,50 @@ func init() {
 	templates = template.Must(template.New("").Funcs(funcs).ParseFS(files, "*"))
 }
 
+func filter(logs []*gosimlog.Log, f func(*gosimlog.Log) bool) []*gosimlog.Log {
+	var filtered []*gosimlog.Log
+	for _, log := range logs {
+		if f(log) {
+			filtered = append(filtered, log)
+		}
+	}
+	return filtered
+}
+
 func (s *Server) Index(w http.ResponseWriter, r *http.Request) {
-	if err := templates.ExecuteTemplate(w, "index.html.tmpl", s); err != nil {
+	q := r.URL.Query()
+	focusStr := q.Get("focus")
+
+	logs := s.Logs
+
+	if focusStr != "" {
+		kind, arg, _ := strings.Cut(focusStr, ":")
+
+		switch kind {
+		case "goroutine":
+			goroutine, err := strconv.Atoi(arg)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("parsing goroutine: %s", err.Error()), http.StatusBadRequest)
+				return
+			}
+			logs = filter(logs, func(l *gosimlog.Log) bool {
+				return l.Goroutine == goroutine
+			})
+
+		case "machine":
+			logs = filter(logs, func(l *gosimlog.Log) bool {
+				return l.Machine == arg
+			})
+
+		default:
+			http.Error(w, fmt.Sprintf("unknown kind %q", kind), http.StatusBadRequest)
+		}
+	}
+
+	if err := templates.ExecuteTemplate(w, "index.html.tmpl", map[string]any{
+		"Logs":  logs,
+		"Focus": focusStr,
+	}); err != nil {
 		http.Error(w, fmt.Sprintf("writing template: %s", err.Error()), http.StatusInternalServerError)
 		return
 	}

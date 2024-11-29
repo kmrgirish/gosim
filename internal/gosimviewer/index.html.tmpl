@@ -6,6 +6,9 @@
 .selected {
     background-color: #F37736;
 }
+.tooltipper {
+    position: relative;
+}
 .tooltip {
     display: none;
     position: absolute;
@@ -14,21 +17,30 @@
     padding: .1em;
     left: 105%;
 }
-a {
-    position: relative;
-}
-a:hover .tooltip {
+.tooltipper:hover .tooltip {
     display: block;
 }
 </style>
 </head>
 <body>
 <div style="display: flex; overflow: hide; height: 100%">
-    <div style="width: 50%; overflow: scroll">
-        <pre style="text-wrap: auto;">
-{{ range .Logs }}<span hx-get="/stack?index={{ .Index }}" hx-trigger="click consume" hx-target="#stack">{{ .Step }} {{ .Machine }}/{{ .Goroutine }} {{.Time | Time }} {{ .Level }} {{ .Source | Source }} > {{ .Msg }}</span>
+    <div style="width: 50%; display: flex; flex-direction: column;">
+        <div>
+            <pre>focus: {{ if .Focus }}{{ .Focus }} <a href="/">all logs</a>{{ else }}all logs{{ end }}</pre>
+        </div>
+        <div style="overflow: scroll; font-family: monospace;">
+{{ range .Logs }}
+    <span>
+        {{ .Step }}
+        <a href="/?focus=machine:{{ .Machine }}">{{ .Machine }}</a>/<a href="/?focus=goroutine:{{ .Goroutine }}">{{.Goroutine}}</a>
+        {{.Time | Time }}
+        {{ .Level }}
+        <a href="#" onclick="show({index: {{ .Index }}, source: {{ .Source }} })">{{ .Source | Source }}</a>
+        &gt;
+        <pre style="display: inline">{{ .Msg }}</pre>
+    </span><br>
 {{ end }}
-        </pre>
+        </div>
     </div>
     <div style="width: 50%; display: flex; flex-direction: column;">
         <div id="source" style="height: 50%; overflow: scroll">
@@ -39,6 +51,14 @@ a:hover .tooltip {
 </div>
 <script>
 var curFile = undefined;
+function show(opts) {
+    if (opts.index !== undefined) {
+        htmx.ajax("GET", "/stack?index=" + opts.index, "#stack");
+    }
+    if (opts.source !== undefined) {
+        htmx.ajax("GET", "/viewer?file=" + encodeURIComponent(opts.source.file) + "&line=" + opts.source.line, "#source");
+    }
+}
 function scrollTo(file, line) {
     var element = document.getElementById("L"+line);
     var newFile = file;
