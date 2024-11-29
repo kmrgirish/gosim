@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -72,8 +73,21 @@ func filter(logs []*gosimlog.Log, f func(*gosimlog.Log) bool) []*gosimlog.Log {
 func (s *Server) Index(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	focusStr := q.Get("focus")
+	levelStr := q.Get("level")
 
 	logs := s.Logs
+
+	level := slog.LevelInfo
+	if levelStr != "" {
+		if err := level.UnmarshalText([]byte(levelStr)); err != nil {
+			http.Error(w, fmt.Sprintf("parsing level: %s", err.Error()), http.StatusBadRequest)
+			return
+		}
+	}
+
+	logs = filter(logs, func(l *gosimlog.Log) bool {
+		return l.Level >= level
+	})
 
 	if focusStr != "" {
 		kind, arg, _ := strings.Cut(focusStr, ":")
@@ -100,8 +114,10 @@ func (s *Server) Index(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := templates.ExecuteTemplate(w, "index.html.tmpl", map[string]any{
-		"Logs":  logs,
-		"Focus": focusStr,
+		"Logs":      logs,
+		"Focus":     focusStr,
+		"LogLevels": []slog.Level{slog.LevelDebug, slog.LevelInfo, slog.LevelWarn, slog.LevelError},
+		"LogLevel":  level,
 	}); err != nil {
 		http.Error(w, fmt.Sprintf("writing template: %s", err.Error()), http.StatusInternalServerError)
 		return

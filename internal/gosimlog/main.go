@@ -19,7 +19,7 @@ type Log struct {
 	Index int `json:"-"`
 
 	Time        time.Time     `json:"time"`
-	Level       string        `json:"level"`
+	Level       slog.Level    `json:"level"`
 	Msg         string        `json:"msg"`
 	Source      *Stackframe   `json:"source"`
 	Step        int           `json:"step"`

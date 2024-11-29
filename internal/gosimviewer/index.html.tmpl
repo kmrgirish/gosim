@@ -18,13 +18,16 @@ a {
 <div style="display: flex; overflow: hide; height: 100%">
     <div style="width: 50%; display: flex; flex-direction: column;">
         <div>
-            <pre>focus: {{ if .Focus }}{{ .Focus }} <a href="/">all logs</a>{{ else }}all logs{{ end }}</pre>
+            {{ $level := .LogLevel }}
+            {{ $focus := .Focus }}
+            <pre>focus: {{ if .Focus }}{{ .Focus }} <a href="/?level={{ $level }}">all logs</a>{{ else }}all logs{{ end }}</pre>
+            <pre>log level:{{ range .LogLevels }} {{ if eq . $level }}{{ . }}{{ else }}<a href="/?level={{ . }}&focus={{ $focus }}">{{ . }}</a>{{ end }}{{ end }}</pre>
         </div>
         <div style="overflow: scroll; font-family: monospace;">
 {{ range .Logs }}
     <span>
         {{ .Step }}
-        <a href="/?focus=machine:{{ .Machine }}">{{ .Machine }}</a>/<a href="/?focus=goroutine:{{ .Goroutine }}">{{.Goroutine}}</a>
+        <a href="/?level={{ $level }}&focus=machine:{{ .Machine }}">{{ .Machine }}</a>/<a href="/?level={{ $level }}&focus=goroutine:{{ .Goroutine }}">{{.Goroutine}}</a>
         {{.Time | Time }}
         {{ .Level }}
         <a href="#" onclick="show({index: {{ .Index }}, source: {{ .Source }} })">{{ .Source | Source }}</a>
