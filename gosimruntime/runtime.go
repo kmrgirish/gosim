@@ -453,6 +453,7 @@ const (
 	corotaskNone corotask = iota
 	corotaskAbort
 	corotaskStep
+	corotaskBacktrace
 )
 
 type goroutine struct {
@@ -469,6 +470,9 @@ type goroutine struct {
 	coro coro.Upcallcoro
 
 	corotask corotask
+
+	backtracePc []uintptr
+	backtraceN  int
 
 	parksynctoken RaceToken
 	shouldacquire bool
@@ -693,6 +697,22 @@ func (g *goroutine) abort() {
 	}
 }
 
+func (g *goroutine) backtrace(pc []uintptr) int {
+	if getg() == g {
+		panic("backtrace self")
+	}
+
+	g.backtracePc = pc
+	g.corotask = corotaskBacktrace
+	g.coro.Next()
+	g.backtracePc = nil
+
+	n := g.backtraceN
+	g.backtraceN = 0
+
+	return n
+}
+
 // Marked norace to read entryToken and entryFun.
 //
 //go:norace
@@ -775,6 +795,8 @@ func (g *goroutine) park(wait bool) {
 			g.coro.Finish()
 		case corotaskStep:
 			return
+		case corotaskBacktrace:
+			g.backtraceN = runtime.Callers(1, g.backtracePc)
 		default:
 			panic(g.corotask)
 		}
@@ -798,6 +820,7 @@ func SetSyscallAllocator(f func(goroutineId int) unsafe.Pointer) {
 	syscallAllocator = f
 }
 
+//go:norace
 func GetGoroutineLocalSyscall() unsafe.Pointer {
 	g := getg()
 	return g.syscallCache
@@ -1040,4 +1063,31 @@ func Step() int {
 
 func GetStep() int {
 	return stepCounter
+}
+
+// GetStacktraceFor captures a stacktrace for any goroutine. It switchers, if
+// necessary, to the requested goroutine and captures its stack with
+// runtime.Callers.
+//
+// TODO: is this necessary? maybe we make goroutines capture their stacks
+// when doing invoke?
+//
+//go:norace
+func GetStacktraceFor(goroutine int, stack []uintptr) int {
+	g := getg()
+	if g.ID == goroutine {
+		return runtime.Callers(1, stack)
+	}
+
+	var n int
+	g.upcall(func() {
+		gs := gs.get()
+		g := gs.goroutinesById[goroutine]
+		if g == nil {
+			// TODO: return 0 or -1 instead?
+			panic("no such goroutine")
+		}
+		n = g.backtrace(stack)
+	})
+	return n
 }

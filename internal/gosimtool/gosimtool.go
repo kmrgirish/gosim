@@ -270,7 +270,7 @@ func GetPathForPrecompiledTestBinary(t *testing.T, pkg string) string {
 				t.Fatalf("failed to stat dependency %q: %s", dep, err)
 			}
 			if !ts.Equal(info.ModTime()) {
-				t.Fatalf("Pre-built gosim test binary is out of date. Input %q changed: %s vs %s.", dep, ts, info.ModTime())
+				t.Fatalf("Pre-built gosim test binary is out of date. Update binaries with gosim build-tests or run an uncached run with -count=1. See the documentation for metatesting. Input %q changed: %s vs %s.", dep, ts, info.ModTime())
 			}
 		}
 	}

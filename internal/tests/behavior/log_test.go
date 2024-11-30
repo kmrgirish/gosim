@@ -15,6 +15,8 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/jellevandenhooff/gosim"
+	"github.com/jellevandenhooff/gosim/gosimruntime"
+	"github.com/jellevandenhooff/gosim/internal/gosimlog"
 )
 
 func TestLogSLog(t *testing.T) {
@@ -126,4 +128,33 @@ func TestLogTraceStacks(t *testing.T) {
 	// print some logs with interesting stacks
 	a(z, 0)
 	a(z, 3)
+}
+
+func testBacktraceForB() {
+	select {}
+}
+
+func testBacktraceForA() {
+	testBacktraceForB()
+}
+
+func TestLogBacktraceFor(t *testing.T) {
+	g0 := gosimruntime.GetGoroutine()
+	var g1 int
+
+	go func() {
+		g1 = gosimruntime.GetGoroutine()
+		gosimruntime.TestRaceToken.Release()
+		testBacktraceForA()
+	}()
+
+	time.Sleep(time.Second)
+	gosimruntime.TestRaceToken.Acquire()
+
+	var pcs [128]uintptr
+	n := gosimruntime.GetStacktraceFor(g0, pcs[:])
+	slog.Info("g0", gosimlog.StackFor(pcs[:n], 0))
+
+	n = gosimruntime.GetStacktraceFor(g1, pcs[:])
+	slog.Info("g1", gosimlog.StackFor(pcs[:n], 0))
 }

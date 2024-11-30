@@ -4,6 +4,7 @@ package simulation
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -14,9 +15,11 @@ import (
 	"os"
 	"sync"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"github.com/jellevandenhooff/gosim/gosimruntime"
+	"github.com/jellevandenhooff/gosim/internal/gosimlog"
 	"github.com/jellevandenhooff/gosim/internal/simulation/fs"
 	"github.com/jellevandenhooff/gosim/internal/simulation/network"
 	"github.com/jellevandenhooff/gosim/internal/simulation/syscallabi"
@@ -79,6 +82,28 @@ func logf(format string, args ...any) {
 	if logInitialized && gosimruntime.TraceSyscall.Enabled() {
 		slog.Info(fmt.Sprintf(format, args...), "traceKind", "syscall")
 	}
+}
+
+// logfFor logs the given format and args on the goroutine from the passed
+// invocation.
+func (l *LinuxOS) logfFor(invocation *syscallabi.Syscall, format string, args ...any) {
+	if !logInitialized || !gosimruntime.TraceSyscall.Enabled() {
+		return
+	}
+
+	msg := fmt.Sprintf(format, args...)
+
+	r := slog.NewRecord(time.Now(), slog.LevelInfo, msg, invocation.PC)
+	r.Add("machine", l.machine.label, "goroutine", invocation.Goroutine, "step", gosimruntime.Step())
+	if gosimruntime.TraceStack.Enabled() {
+		// TODO: log invocation from its goroutine instead and skip this trickery?
+		// TODO: stick stacktrace on invocation instead?
+		var pcs [128]uintptr
+		n := gosimruntime.GetStacktraceFor(invocation.Goroutine, pcs[:])
+		r.AddAttrs(gosimlog.StackFor(pcs[:n], invocation.PC))
+	}
+
+	l.simulation.rawLogger.Handler().Handle(context.TODO(), r)
 }
 
 // used to be...
@@ -225,7 +250,8 @@ func (l *LinuxOS) SysOpenat(dirfd int, path string, flags int, mode uint32, invo
 	// just get rid of this
 	flags &= ^syscall.O_CLOEXEC
 
-	logf("openat %d %s %d %d", dirfd, path, flags, mode)
+	// logf("openat %d %s %d %d", dirfd, path, flags, mode)
+	l.logfFor(invocation, "openat %d %s %d %d", dirfd, path, flags, mode)
 
 	// TODO: some rules about paths; component length; total length; allow characters?
 	// TODO: check mode
@@ -280,7 +306,7 @@ func (l *LinuxOS) SysRenameat(olddirfd int, oldpath string, newdirfd int, newpat
 		return syscall.EINVAL
 	}
 
-	logf("renameat %d %s %d %s", olddirfd, oldpath, newdirfd, newpath)
+	l.logfFor(invocation, "renameat %d %s %d %s", olddirfd, oldpath, newdirfd, newpath)
 
 	oldInode, err := l.dirInodeForFd(olddirfd)
 	if err != nil {
@@ -308,7 +334,7 @@ func (l *LinuxOS) SysGetdents64(fd int, data syscallabi.ByteSliceView, invocatio
 		return 0, syscall.EINVAL
 	}
 
-	logf("getdents64 %d %d", fd, data.Len())
+	l.logfFor(invocation, "getdents64 %d %d", fd, data.Len())
 
 	fdInternal, ok := l.files[fd]
 	if !ok {
@@ -363,7 +389,7 @@ func (l *LinuxOS) SysGetdents64(fd int, data syscallabi.ByteSliceView, invocatio
 		retn += reclen
 	}
 
-	logf("getdents64 %d %d", fd, data.Len() /*, data*/)
+	l.logfFor(invocation, "getdents64 %d %d", fd, data.Len() /*, data*/)
 
 	f.didReaddir = true
 
@@ -401,7 +427,7 @@ func (l *LinuxOS) SysWrite(fd int, data syscallabi.ByteSliceView, invocation *sy
 
 	fdInternal, ok := l.files[fd]
 	if !ok {
-		logf("write %d badfd", fd)
+		l.logfFor(invocation, "write %d badfd", fd)
 		return 0, syscall.EBADFD
 	}
 
@@ -414,7 +440,7 @@ func (l *LinuxOS) SysWrite(fd int, data syscallabi.ByteSliceView, invocation *sy
 		retn := l.machine.filesystem.Write(f.inode, f.pos, data)
 		f.pos += int64(retn)
 
-		logf("write %d %d %q", fd, data.Len(), data)
+		l.logfFor(invocation, "write %d %d %q", fd, data.Len(), data)
 		return retn, nil
 
 	case *Socket:
@@ -433,7 +459,7 @@ func (l *LinuxOS) SysWrite(fd int, data syscallabi.ByteSliceView, invocation *sy
 			return retn, syscall.EBADFD
 		}
 
-		logf("write %d %d %q", fd, data.Len(), data)
+		l.logfFor(invocation, "write %d %d %q", fd, data.Len(), data)
 		return retn, nil
 
 	default:
@@ -462,7 +488,7 @@ func (l *LinuxOS) SysRead(fd int, data syscallabi.ByteSliceView, invocation *sys
 		retn := l.machine.filesystem.Read(f.inode, f.pos, data)
 		f.pos += int64(retn)
 
-		logf("read %d %d", fd, data.Len() /*, data[:retn]*/)
+		l.logfFor(invocation, "read %d %d", fd, data.Len() /*, data[:retn]*/)
 
 		return retn, nil
 
@@ -482,7 +508,7 @@ func (l *LinuxOS) SysRead(fd int, data syscallabi.ByteSliceView, invocation *sys
 			return 0, syscall.EBADFD
 		}
 
-		logf("read %d %d", fd, data.Len() /*, data[:retn]*/)
+		l.logfFor(invocation, "read %d %d", fd, data.Len() /*, data[:retn]*/)
 
 		return retn, nil
 
@@ -508,7 +534,7 @@ func (l *LinuxOS) SysFallocate(fd int, mode uint32, off int64, len int64, invoca
 		return syscall.EBADFD
 	}
 
-	logf("fallocate %d %d %d %d", fd, mode, off, len)
+	l.logfFor(invocation, "fallocate %d %d %d %d", fd, mode, off, len)
 
 	if mode != 0 {
 		return syscall.EINVAL
@@ -548,7 +574,7 @@ func (l *LinuxOS) SysLseek(fd int, offset int64, whence int, invocation *syscall
 		return 0, syscall.EBADFD
 	}
 
-	logf("lseek %d %d %d", fd, offset, whence)
+	l.logfFor(invocation, "lseek %d %d %d", fd, offset, whence)
 	var newPos int64
 
 	switch whence {
@@ -599,7 +625,7 @@ func (l *LinuxOS) SysPwrite64(fd int, data syscallabi.ByteSliceView, offset int6
 
 	retn := l.machine.filesystem.Write(f.inode, offset, data)
 
-	logf("writeat %d %d %q %d", fd, retn, data, offset)
+	l.logfFor(invocation, "writeat %d %d %q %d", fd, retn, data, offset)
 
 	return retn, nil
 }
@@ -627,7 +653,7 @@ func (l *LinuxOS) SysPread64(fd int, data syscallabi.ByteSliceView, offset int64
 
 	retn := l.machine.filesystem.Read(f.inode, offset, data)
 
-	logf("readat %d %d %d", fd, data.Len() /*, data[:retn]*/, offset)
+	l.logfFor(invocation, "readat %d %d %d", fd, data.Len() /*, data[:retn]*/, offset)
 
 	return retn, nil
 }
@@ -673,7 +699,7 @@ func (l *LinuxOS) SysFsync(fd int, invocation *syscallabi.Syscall) error {
 
 	l.machine.filesystem.Sync(f.inode)
 
-	logf("fsync %d", fd)
+	l.logfFor(invocation, "fsync %d", fd)
 
 	return nil
 }
@@ -702,7 +728,7 @@ func (l *LinuxOS) SysFstat(fd int, statBuf syscallabi.ValueView[syscall.Stat_t],
 		return syscall.EINVAL
 	}
 
-	logf("fstat %d", fd)
+	l.logfFor(invocation, "fstat %d", fd)
 
 	fdInternal, ok := l.files[fd]
 	if !ok {
@@ -745,7 +771,7 @@ func (l *LinuxOS) SysFstatat(dirfd int, path string, statBuf syscallabi.ValueVie
 		return syscall.EINVAL // XXX?
 	}
 
-	logf("fstatat %d %s %d", dirfd, path, flags)
+	l.logfFor(invocation, "fstatat %d %s %d", dirfd, path, flags)
 
 	fsStat, err := l.machine.filesystem.Stat(dirInode, path)
 	if err != nil {
@@ -777,7 +803,7 @@ func (l *LinuxOS) SysUnlinkat(dirfd int, path string, flags int, invocation *sys
 		return err
 	}
 
-	logf("unlinkat %d %s %d", dirfd, path, flags)
+	l.logfFor(invocation, "unlinkat %d %s %d", dirfd, path, flags)
 
 	switch flags {
 	case 0:
@@ -818,7 +844,7 @@ func (l *LinuxOS) SysFtruncate(fd int, n int64, invocation *syscallabi.Syscall) 
 
 	l.machine.filesystem.Truncate(f.inode, int(n))
 
-	logf("truncate %d %d", fd, n)
+	l.logfFor(invocation, "truncate %d %d", fd, n)
 
 	return nil
 }
@@ -830,7 +856,7 @@ func (l *LinuxOS) SysClose(fd int, invocation *syscallabi.Syscall) error {
 		return syscall.EINVAL
 	}
 
-	logf("close %d", fd)
+	l.logfFor(invocation, "close %d", fd)
 
 	fdInternal, ok := l.files[fd]
 	if !ok {
@@ -866,7 +892,7 @@ func (l *LinuxOS) SysSocket(net, flags, proto int, invocation *syscallabi.Syscal
 
 	// handle sock_posix func (p *ipStackCapabilities) probe()
 
-	logf("socket %d %d %d", net, flags, proto)
+	l.logfFor(invocation, "socket %d %d %d", net, flags, proto)
 
 	// ipv4 close on exec non blocking tcp streams ONLY
 	if net != syscall.AF_INET {
@@ -911,7 +937,7 @@ func (l *LinuxOS) SysBind(fd int, addrPtr unsafe.Pointer, addrlen Socklen, invoc
 		return err
 	}
 
-	logf("bind %d %s", fd, addr)
+	l.logfFor(invocation, "bind %d %s", fd, addr)
 
 	switch {
 	case addr.Addr().Is4():
@@ -956,7 +982,7 @@ func (l *LinuxOS) SysListen(fd, backlog int, invocation *syscallabi.Syscall) err
 	}
 	sock.Listener = listener
 
-	logf("listen %d %d", fd, backlog)
+	l.logfFor(invocation, "listen %d %d", fd, backlog)
 
 	return nil
 }
@@ -1015,7 +1041,7 @@ func (l *LinuxOS) SysAccept4(fd int, rsa syscallabi.ValueView[RawSockaddrAny], l
 		return 0, syscall.EINVAL
 	}
 
-	logf("accept %d %d %d", fd, len.Get(), flags)
+	l.logfFor(invocation, "accept %d %d %d", fd, len.Get(), flags)
 
 	if flags != syscall.SOCK_CLOEXEC|syscall.SOCK_NONBLOCK {
 		// XXX: check that flags are CLOEXEC and NONBLOCK (just like sys_socket)
@@ -1063,7 +1089,7 @@ func (l *LinuxOS) SysGetsockopt(fd int, level int, name int, ptr unsafe.Pointer,
 		return syscall.EINVAL
 	}
 
-	logf("getsockopt %d %d %d %d", fd, level, name, outlen.Get())
+	l.logfFor(invocation, "getsockopt %d %d %d %d", fd, level, name, outlen.Get())
 
 	fdInternal, ok := l.files[fd]
 	if !ok {
@@ -1130,7 +1156,7 @@ func (l *LinuxOS) SysGetsockname(fd int, rsa syscallabi.ValueView[RawSockaddrAny
 		return syscall.EINVAL
 	}
 
-	logf("getsockname %d %d", fd, len.Get())
+	l.logfFor(invocation, "getsockname %d %d", fd, len.Get())
 
 	fdInternal, ok := l.files[fd]
 	if !ok {
@@ -1167,7 +1193,7 @@ func (l *LinuxOS) SysChdir(path string, invocation *syscallabi.Syscall) (err err
 		return syscall.EINVAL
 	}
 
-	logf("chdir %s", path)
+	l.logfFor(invocation, "chdir %s", path)
 
 	newDirinode, err := l.machine.filesystem.Getdirinode(l.workdirInode, path)
 	if err != nil {
@@ -1185,7 +1211,7 @@ func (l *LinuxOS) SysGetcwd(buf syscallabi.SliceView[byte], invocation *syscalla
 		return 0, syscall.EINVAL
 	}
 
-	logf("getcwd")
+	l.logfFor(invocation, "getcwd")
 
 	s, err := l.machine.filesystem.Getpath(l.workdirInode)
 	if err != nil {
@@ -1210,7 +1236,7 @@ func (l *LinuxOS) SysMkdirat(dirfd int, path string, mode uint32, invocation *sy
 		return syscall.EINVAL
 	}
 
-	logf("mkdirat %d %s %d", dirfd, path, mode)
+	l.logfFor(invocation, "mkdirat %d %s %d", dirfd, path, mode)
 
 	dirInode, err := l.dirInodeForFd(dirfd)
 	if err != nil {
@@ -1227,7 +1253,7 @@ func (l *LinuxOS) SysGetpeername(fd int, rsa syscallabi.ValueView[RawSockaddrAny
 		return syscall.EINVAL
 	}
 
-	logf("getpeername %d %d", fd, len.Get())
+	l.logfFor(invocation, "getpeername %d %d", fd, len.Get())
 
 	fdInternal, ok := l.files[fd]
 	if !ok {
@@ -1301,7 +1327,7 @@ func (l *LinuxOS) SysConnect(fd int, addrPtr unsafe.Pointer, addrLen Socklen, in
 		return errno
 	}
 
-	logf("connect %d %s", fd, addr)
+	l.logfFor(invocation, "connect %d %s", fd, addr)
 
 	switch {
 	case addr.Addr().Is4():
@@ -1330,7 +1356,7 @@ func (l *LinuxOS) SysGetrandom(ptr syscallabi.ByteSliceView, flags int, invocati
 		return 0, syscall.EINVAL
 	}
 
-	logf("getrandom %d %d", ptr.Len(), flags)
+	l.logfFor(invocation, "getrandom %d %d", ptr.Len(), flags)
 
 	if flags != 0 {
 		return 0, syscall.EINVAL
@@ -1366,7 +1392,7 @@ func (l *LinuxOS) SysUname(buf syscallabi.ValueView[Utsname], invocation *syscal
 }
 
 func (l *LinuxOS) SysMadvise(b syscallabi.SliceView[byte], advice int, invocation *syscallabi.Syscall) (err error) {
-	logf("madvise %d %d %d", uintptr(unsafe.Pointer(unsafe.SliceData(b.Ptr))), b.Len(), advice)
+	l.logfFor(invocation, "madvise %d %d %d", uintptr(unsafe.Pointer(unsafe.SliceData(b.Ptr))), b.Len(), advice)
 	// ignore? check args for some sanity?
 	return nil
 }
@@ -1378,10 +1404,10 @@ func (l *LinuxOS) SysMmap(addr uintptr, length uintptr, prot int, flags int, fd 
 		return 0, syscall.EINVAL
 	}
 
-	logf("mmap %d %d %d %d %d %d", addr, length, prot, flags, fd, offset)
+	l.logfFor(invocation, "mmap %d %d %d %d %d %d", addr, length, prot, flags, fd, offset)
 
 	if length > 16*1024*1024 {
-		logf("mmap too big")
+		l.logfFor(invocation, "mmap too big")
 		return 0, syscall.EINVAL
 	}
 
@@ -1423,7 +1449,7 @@ func (l *LinuxOS) SysMunmap(addr uintptr, length uintptr, invocation *syscallabi
 		return syscall.EINVAL
 	}
 
-	logf("munmap %d %d", addr, length)
+	l.logfFor(invocation, "munmap %d %d", addr, length)
 
 	mmap, ok := l.mmaps[addr]
 	if !ok {

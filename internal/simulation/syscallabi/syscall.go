@@ -1,6 +1,7 @@
 package syscallabi
 
 import (
+	"runtime"
 	"unsafe"
 
 	"github.com/jellevandenhooff/gosim/gosimruntime"
@@ -29,8 +30,16 @@ func Setup() {
 // one syscall at a time.
 //
 // TODO: Just pool them instead?
+//
+//go:norace
 func GetGoroutineLocalSyscall() *Syscall {
-	return (*Syscall)(gosimruntime.GetGoroutineLocalSyscall())
+	syscall := (*Syscall)(gosimruntime.GetGoroutineLocalSyscall())
+
+	var pc [1]uintptr
+	runtime.Callers(3, pc[:])
+	syscall.PC = pc[0]
+
+	return syscall
 }
 
 // Syscall holds the arguments and return values of gosim syscalls.
@@ -46,6 +55,7 @@ type Syscall struct {
 	OS         any
 
 	Goroutine int
+	PC        uintptr
 
 	Int0, Int1, Int2, Int3, Int4, Int5 uintptr
 	Ptr0, Ptr1, Ptr2, Ptr3, Ptr4       any

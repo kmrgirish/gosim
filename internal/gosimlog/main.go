@@ -46,11 +46,18 @@ func ParseLog(logs []byte) []*Log {
 	return out
 }
 
+// Stack captures a stack with runtime.Callers and return a stackframes
+// slog.Attr. If base is non-zero, Stack will skip frames until encountering
+// base as a PC, which is helpful for calling Stack in a slog handler.
 func Stack(skip int, base uintptr) slog.Attr {
 	var stackRaw [256]uintptr
 	n := runtime.Callers(skip+1, stackRaw[:])
+	return StackFor(stackRaw[:n], base)
+}
 
-	stack := stackRaw[:n]
+// StackFor returns a stackframes attr for a stack captured with runtime.Callers.
+func StackFor(stack []uintptr, base uintptr) slog.Attr {
+	var frames []Stackframe
 	found := false
 	if base == 0 {
 		found = true
@@ -60,8 +67,6 @@ func Stack(skip int, base uintptr) slog.Attr {
 			found = true
 		}
 	}
-
-	var frames []Stackframe
 	if len(stack) > 0 {
 		framesIter := runtime.CallersFrames(stack)
 		for {

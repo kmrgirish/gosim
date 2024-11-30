@@ -180,7 +180,8 @@ func extractStacksUntilTest(logs []*gosimlog.Log) []MsgAndStack {
 		var stack []string
 		for _, frame := range log.Stackframes {
 			f := frame.Function
-			f = f[strings.LastIndex(f, ".")+1:]
+			f = f[strings.LastIndex(f, "/")+1:]
+			f = f[strings.Index(f, ".")+1:]
 			stack = append(stack, f)
 			if strings.HasPrefix(f, "ImplTest") {
 				break
@@ -256,6 +257,35 @@ func TestLogTraceStacks(t *testing.T) {
 		{
 			Msg:   "hello from zap",
 			Stack: []string{"c", "b", "a", "a", "a", "a", "ImplTestLogTraceStacks"},
+		},
+	}); diff != "" {
+		t.Error("diff", diff)
+	}
+}
+
+func TestLogBacktraceFor(t *testing.T) {
+	mt := metatesting.ForCurrentPackage(t)
+
+	// stacks with simtrace stack
+	run, err := mt.Run(t, &metatesting.RunConfig{
+		Test: "TestLogBacktraceFor",
+		Seed: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if diff := cmp.Diff(extractStacksUntilTest(gosimlog.ParseLog(run.LogOutput)), []MsgAndStack{
+		{
+			Msg:   "g0",
+			Stack: []string{"GetStacktraceFor", "ImplTestLogBacktraceFor"},
+		},
+		{
+			Msg: "g1",
+			Stack: []string{
+				"(*goroutine).park", "(*goroutine).wait", "Select", "testBacktraceForB",
+				"testBacktraceForA", "ImplTestLogBacktraceFor.func1",
+			},
 		},
 	}); diff != "" {
 		t.Error("diff", diff)
