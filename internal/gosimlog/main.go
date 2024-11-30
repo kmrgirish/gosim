@@ -26,6 +26,7 @@ type Log struct {
 	Stackframes []*Stackframe `json:"stackframes"`
 	Machine     string        `json:"machine"`
 	Goroutine   int           `json:"goroutine"`
+	TraceKind   string        `json:"traceKind"`
 
 	// map[string]any for extra fields
 }

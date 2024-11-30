@@ -74,8 +74,26 @@ func (s *Server) Index(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	focusStr := q.Get("focus")
 	levelStr := q.Get("level")
+	syscallsStr := q.Get("syscalls")
 
 	logs := s.Logs
+
+	var syscalls bool
+	if syscallsStr != "" {
+		var err error
+		syscalls, err = strconv.ParseBool(syscallsStr)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("parsing syscalls: %s", err.Error()), http.StatusBadRequest)
+			return
+		}
+	}
+
+	logs = filter(logs, func(l *gosimlog.Log) bool {
+		if l.TraceKind == "syscall" && !syscalls {
+			return false
+		}
+		return true
+	})
 
 	level := slog.LevelInfo
 	if levelStr != "" {
@@ -113,11 +131,19 @@ func (s *Server) Index(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	truncated := false
+	if limit := 1000; len(logs) > limit {
+		logs = logs[:limit]
+		truncated = true
+	}
+
 	if err := templates.ExecuteTemplate(w, "index.html.tmpl", map[string]any{
 		"Logs":      logs,
 		"Focus":     focusStr,
 		"LogLevels": []slog.Level{slog.LevelDebug, slog.LevelInfo, slog.LevelWarn, slog.LevelError},
 		"LogLevel":  level,
+		"Syscalls":  syscalls,
+		"Truncated": truncated,
 	}); err != nil {
 		http.Error(w, fmt.Sprintf("writing template: %s", err.Error()), http.StatusInternalServerError)
 		return

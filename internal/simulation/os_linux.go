@@ -6,8 +6,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
-	"log"
 	"log/slog"
 	"math/rand"
 	"net/netip"
@@ -75,9 +75,9 @@ func (l *LinuxOS) doShutdown() {
 	l.files = nil
 }
 
-func logf(fmt string, args ...any) {
+func logf(format string, args ...any) {
 	if logInitialized && gosimruntime.TraceSyscall.Enabled() {
-		log.Printf(fmt, args...)
+		slog.Info(fmt.Sprintf(format, args...), "traceKind", "syscall")
 	}
 }
 

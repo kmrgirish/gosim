@@ -155,6 +155,7 @@ func TestLogTraceSyscall(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// TODO: make sure we check traceKind?
 	// TODO: support snapshotting these logs?
 	// TODO: include machine etc.?
 	if diff := cmp.Diff(metatesting.SimplifyParsedLog(metatesting.ParseLog(run.LogOutput)), []string{

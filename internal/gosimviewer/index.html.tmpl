@@ -15,26 +15,30 @@ a {
 </style>
 </head>
 <body>
-<div style="display: flex; overflow: hide; height: 100%">
+<div id="root" style="display: flex; overflow: hide; height: 100%">
     <div style="width: 50%; display: flex; flex-direction: column;">
         <div>
             {{ $level := .LogLevel }}
             {{ $focus := .Focus }}
-            <pre>focus: {{ if .Focus }}{{ .Focus }} <a href="/?level={{ $level }}">all logs</a>{{ else }}all logs{{ end }}</pre>
-            <pre>log level:{{ range .LogLevels }} {{ if eq . $level }}{{ . }}{{ else }}<a href="/?level={{ . }}&focus={{ $focus }}">{{ . }}</a>{{ end }}{{ end }}</pre>
+            <span style="font-family: monospace">
+                focus: {{ if .Focus }}{{ .Focus }} <a href="#" onclick="setFilter({focus: '' })">all logs</a>{{ else }}all logs{{ end }}</pre>;
+                log level:{{ range .LogLevels }} {{ if eq . $level }}{{ . }}{{ else }}<a href="#" onclick="setFilter({level: {{ . }} })">{{ . }}</a>{{ end }}{{ end }}</pre>;
+                <label for="syscalls">syscalls: </label><input id="syscalls" type="checkbox" onclick="setFilter({syscalls: event.target.checked})" {{ if .Syscalls }}checked{{ end }}/>
+            </span>
         </div>
         <div style="overflow: scroll; font-family: monospace;">
 {{ range .Logs }}
     <span>
         {{ .Step }}
-        <a href="/?level={{ $level }}&focus=machine:{{ .Machine }}">{{ .Machine }}</a>/<a href="/?level={{ $level }}&focus=goroutine:{{ .Goroutine }}">{{.Goroutine}}</a>
+        <a href="#" onclick="setFilter({focus: 'machine:{{ .Machine }}'})">{{ .Machine }}</a>/<a href="#" onclick="setFilter({focus: 'goroutine:{{ .Goroutine }}'})">{{.Goroutine}}</a>
         {{.Time | Time }}
         {{ .Level }}
         <a href="#" onclick="show({index: {{ .Index }}, source: {{ .Source }} })">{{ .Source | Source }}</a>
         &gt;
-        <pre style="display: inline">{{ .Msg }}</pre>
+        <pre style="display: inline; text-wrap: wrap;">{{ .Msg }}</pre>
     </span><br>
 {{ end }}
+            {{ if .Truncated }}and more...{{ end }}
         </div>
     </div>
     <div style="width: 50%; display: flex; flex-direction: column;">
@@ -64,12 +68,23 @@ function scrollTo(file, line) {
         element.scrollIntoViewIfNeeded({block: "center"});
     }
 }
-htmx.onLoad(function(e) {
-    tippy(e.querySelectorAll('[data-tooltip]'), {
-        duration: 0,
-        maxWidth: "none",
-        content: function(e) { return e.getAttribute('data-tooltip'); },
-    });
+function setFilter(update) {
+    var current = {
+        focus: {{ .Focus }},
+        level: {{ .LogLevel }},
+        syscalls: {{ .Syscalls }},
+    };
+    Object.assign(current, update);
+    var path = "/?focus=" + encodeURIComponent(current.focus) +
+        "&level=" + encodeURIComponent(current.level) +
+        "&syscalls=" + encodeURIComponent(current.syscalls);
+    window.location = path;
+}
+tippy.delegate("#root", {
+    target: '[data-tooltip]',
+    duration: 0,
+    maxWidth: "none",
+    content: function(e) { return e.getAttribute('data-tooltip'); },
 });
 </script>
 </body>
