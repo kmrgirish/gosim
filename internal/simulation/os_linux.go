@@ -94,7 +94,7 @@ func (l *LinuxOS) logfFor(invocation *syscallabi.Syscall, format string, args ..
 	msg := fmt.Sprintf(format, args...)
 
 	r := slog.NewRecord(time.Now(), slog.LevelInfo, msg, invocation.PC)
-	r.Add("machine", l.machine.label, "goroutine", invocation.Goroutine, "step", gosimruntime.Step())
+	r.Add("machine", l.machine.label, "goroutine", invocation.Goroutine, "step", gosimruntime.Step(), "traceKind", "syscall")
 	if gosimruntime.TraceStack.Enabled() {
 		// TODO: log invocation from its goroutine instead and skip this trickery?
 		// TODO: stick stacktrace on invocation instead?
