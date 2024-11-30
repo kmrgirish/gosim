@@ -441,7 +441,7 @@ func writeProxies(rootDir string, pkgs []string, syscalls []syscallInfo, version
 	for _, pkg := range pkgs {
 		file := strings.Replace(pkg, ".", "", -1)
 		file = strings.Replace(file, "/", "_", -1)
-		path := path.Join(rootDir, "internal/hooks/"+version, file+"_gensyscall_"+arch+".go")
+		path := path.Join(rootDir, "internal/hooks/"+version, file+"_gen_"+arch+".go")
 
 		writeFormattedGoFile(path, `//go:build linux
 package `+version+`
@@ -845,8 +845,8 @@ func main() {
 			},
 		}...)
 
-		writeSyscalls(path.Join(rootDir, "internal/simulation/linux_gensyscall_"+arch+".go"), deduped, sysnums, false)
+		writeSyscalls(path.Join(rootDir, "internal/simulation/linux_gen_"+arch+".go"), deduped, sysnums, false)
 	}
 
-	writeSyscalls(path.Join(rootDir, "internal/simulation/gosim_gensyscall.go"), machineCalls, nil, true)
+	writeSyscalls(path.Join(rootDir, "internal/simulation/gosim_gen.go"), machineCalls, nil, true)
 }
