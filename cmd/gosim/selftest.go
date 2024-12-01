@@ -49,6 +49,8 @@ func prepareSelftest() {
 	args = append(args, "-o", buildDir)
 	args = append(args, "./internal/tests/race/testdata")
 	cmd := exec.Command(name, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			os.Exit(exitErr.ExitCode())
