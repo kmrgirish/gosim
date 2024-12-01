@@ -4,7 +4,6 @@ package simulation
 
 import (
 	"bytes"
-	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -15,11 +14,9 @@ import (
 	"os"
 	"sync"
 	"syscall"
-	"time"
 	"unsafe"
 
 	"github.com/jellevandenhooff/gosim/gosimruntime"
-	"github.com/jellevandenhooff/gosim/internal/gosimlog"
 	"github.com/jellevandenhooff/gosim/internal/simulation/fs"
 	"github.com/jellevandenhooff/gosim/internal/simulation/network"
 	"github.com/jellevandenhooff/gosim/internal/simulation/syscallabi"
@@ -84,6 +81,21 @@ func logf(format string, args ...any) {
 	}
 }
 
+//go:norace
+func logSyscallInvoke(name string, invocation *syscallabi.Syscall) {
+	if logInitialized && gosimruntime.TraceSyscall.Enabled() {
+		invocation.Step = gosimruntime.Step()
+		slog.Info("invoking "+name, "step", invocation.Step, "traceKind", "syscall")
+	}
+}
+
+//go:norace
+func logSyscallReturn(name string, invocation *syscallabi.Syscall) {
+	if logInitialized && gosimruntime.TraceSyscall.Enabled() {
+		slog.Info(name+" returned", "relatedStep", invocation.Step, "traceKind", "syscall")
+	}
+}
+
 // logfFor logs the given format and args on the goroutine from the passed
 // invocation.
 func (l *LinuxOS) logfFor(invocation *syscallabi.Syscall, format string, args ...any) {
@@ -91,19 +103,26 @@ func (l *LinuxOS) logfFor(invocation *syscallabi.Syscall, format string, args ..
 		return
 	}
 
-	msg := fmt.Sprintf(format, args...)
-
-	r := slog.NewRecord(time.Now(), slog.LevelInfo, msg, invocation.PC)
-	r.Add("machine", l.machine.label, "goroutine", invocation.Goroutine, "step", gosimruntime.Step(), "traceKind", "syscall")
-	if gosimruntime.TraceStack.Enabled() {
-		// TODO: log invocation from its goroutine instead and skip this trickery?
-		// TODO: stick stacktrace on invocation instead?
-		var pcs [128]uintptr
-		n := gosimruntime.GetStacktraceFor(invocation.Goroutine, pcs[:])
-		r.AddAttrs(gosimlog.StackFor(pcs[:n], invocation.PC))
+	if invocation.Step == 0 {
+		return
 	}
 
-	l.simulation.rawLogger.Handler().Handle(context.TODO(), r)
+	msg := fmt.Sprintf(format, args...)
+	slog.Info(msg, "relatedStep", invocation.Step, "traceKind", "syscall")
+
+	/*
+		r := slog.NewRecord(time.Now(), slog.LevelInfo, msg, invocation.PC)
+		r.Add("machine", l.machine.label, "goroutine", invocation.Goroutine, "step", gosimruntime.Step(), "traceKind", "syscall")
+		if gosimruntime.TraceStack.Enabled() {
+			// TODO: log invocation from its goroutine instead and skip this trickery?
+			// TODO: stick stacktrace on invocation instead?
+			var pcs [128]uintptr
+			n := gosimruntime.GetStacktraceFor(invocation.Goroutine, pcs[:])
+			r.AddAttrs(gosimlog.StackFor(pcs[:n], invocation.PC))
+		}
+
+		l.simulation.rawLogger.Handler().Handle(context.TODO(), r)
+	*/
 }
 
 // used to be...

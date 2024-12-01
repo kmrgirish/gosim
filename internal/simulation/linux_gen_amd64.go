@@ -87,7 +87,9 @@ func SyscallPollClose(fd int, desc *syscallabi.PollDesc) (code int) {
 	syscall.OS = linuxOS
 	syscall.Int0 = uintptr(fd)
 	syscall.Ptr1 = desc
+	logSyscallInvoke("PollClose", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("PollClose", syscall)
 	code = int(syscall.R0)
 	syscall.Ptr1 = nil
 	return
@@ -109,7 +111,9 @@ func SyscallPollOpen(fd int, desc *syscallabi.PollDesc) (code int) {
 	syscall.OS = linuxOS
 	syscall.Int0 = uintptr(fd)
 	syscall.Ptr1 = desc
+	logSyscallInvoke("PollOpen", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("PollOpen", syscall)
 	code = int(syscall.R0)
 	syscall.Ptr1 = nil
 	return
@@ -133,7 +137,9 @@ func SyscallSysAccept4(s int, rsa *RawSockaddrAny, addrlen *Socklen, flags int) 
 	syscall.Ptr1 = rsa
 	syscall.Ptr2 = addrlen
 	syscall.Int3 = uintptr(flags)
+	logSyscallInvoke("SysAccept4", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysAccept4", syscall)
 	fd = int(syscall.R0)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	syscall.Ptr1 = nil
@@ -161,7 +167,9 @@ func SyscallSysBind(s int, addr unsafe.Pointer, addrlen Socklen) (err error) {
 	syscall.Int0 = uintptr(s)
 	syscall.Ptr1 = addr
 	syscall.Int2 = uintptr(addrlen)
+	logSyscallInvoke("SysBind", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysBind", syscall)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	syscall.Ptr1 = nil
 	return
@@ -183,7 +191,9 @@ func SyscallSysChdir(path string) (err error) {
 	syscall.Trampoline = trampolineSysChdir
 	syscall.OS = linuxOS
 	syscall.Ptr0 = path
+	logSyscallInvoke("SysChdir", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysChdir", syscall)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	syscall.Ptr0 = nil
 	return
@@ -203,7 +213,9 @@ func SyscallSysClose(fd int) (err error) {
 	syscall.Trampoline = trampolineSysClose
 	syscall.OS = linuxOS
 	syscall.Int0 = uintptr(fd)
+	logSyscallInvoke("SysClose", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysClose", syscall)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	return
 }
@@ -224,7 +236,9 @@ func SyscallSysConnect(s int, addr unsafe.Pointer, addrlen Socklen) (err error) 
 	syscall.Int0 = uintptr(s)
 	syscall.Ptr1 = addr
 	syscall.Int2 = uintptr(addrlen)
+	logSyscallInvoke("SysConnect", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysConnect", syscall)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	syscall.Ptr1 = nil
 	return
@@ -249,7 +263,9 @@ func SyscallSysFallocate(fd int, mode uint32, off int64, len int64) (err error) 
 	syscall.Int1 = uintptr(mode)
 	syscall.Int2 = uintptr(off)
 	syscall.Int3 = uintptr(len)
+	logSyscallInvoke("SysFallocate", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysFallocate", syscall)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	return
 }
@@ -273,7 +289,9 @@ func SyscallSysFcntl(fd int, cmd int, arg int) (val int, err error) {
 	syscall.Int0 = uintptr(fd)
 	syscall.Int1 = uintptr(cmd)
 	syscall.Int2 = uintptr(arg)
+	logSyscallInvoke("SysFcntl", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysFcntl", syscall)
 	val = int(syscall.R0)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	return
@@ -296,7 +314,9 @@ func SyscallSysFdatasync(fd int) (err error) {
 	syscall.Trampoline = trampolineSysFdatasync
 	syscall.OS = linuxOS
 	syscall.Int0 = uintptr(fd)
+	logSyscallInvoke("SysFdatasync", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysFdatasync", syscall)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	return
 }
@@ -316,7 +336,9 @@ func SyscallSysFlock(fd int, how int) (err error) {
 	syscall.OS = linuxOS
 	syscall.Int0 = uintptr(fd)
 	syscall.Int1 = uintptr(how)
+	logSyscallInvoke("SysFlock", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysFlock", syscall)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	return
 }
@@ -337,7 +359,9 @@ func SyscallSysFstat(fd int, stat *Stat_t) (err error) {
 	syscall.OS = linuxOS
 	syscall.Int0 = uintptr(fd)
 	syscall.Ptr1 = stat
+	logSyscallInvoke("SysFstat", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysFstat", syscall)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	syscall.Ptr1 = nil
 	return
@@ -358,7 +382,9 @@ func SyscallSysFsync(fd int) (err error) {
 	syscall.Trampoline = trampolineSysFsync
 	syscall.OS = linuxOS
 	syscall.Int0 = uintptr(fd)
+	logSyscallInvoke("SysFsync", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysFsync", syscall)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	return
 }
@@ -378,7 +404,9 @@ func SyscallSysFtruncate(fd int, length int64) (err error) {
 	syscall.OS = linuxOS
 	syscall.Int0 = uintptr(fd)
 	syscall.Int1 = uintptr(length)
+	logSyscallInvoke("SysFtruncate", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysFtruncate", syscall)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	return
 }
@@ -398,7 +426,9 @@ func SyscallSysGetcwd(buf []byte) (n int, err error) {
 	syscall.Trampoline = trampolineSysGetcwd
 	syscall.OS = linuxOS
 	syscall.Ptr0, syscall.Int0 = unsafe.SliceData(buf), uintptr(len(buf))
+	logSyscallInvoke("SysGetcwd", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysGetcwd", syscall)
 	n = int(syscall.R0)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	syscall.Ptr0 = nil
@@ -421,7 +451,9 @@ func SyscallSysGetdents64(fd int, buf []byte) (n int, err error) {
 	syscall.OS = linuxOS
 	syscall.Int0 = uintptr(fd)
 	syscall.Ptr1, syscall.Int1 = unsafe.SliceData(buf), uintptr(len(buf))
+	logSyscallInvoke("SysGetdents64", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysGetdents64", syscall)
 	n = int(syscall.R0)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	syscall.Ptr1 = nil
@@ -446,7 +478,9 @@ func SyscallSysGetpeername(fd int, rsa *RawSockaddrAny, addrlen *Socklen) (err e
 	syscall.Int0 = uintptr(fd)
 	syscall.Ptr1 = rsa
 	syscall.Ptr2 = addrlen
+	logSyscallInvoke("SysGetpeername", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysGetpeername", syscall)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	syscall.Ptr1 = nil
 	syscall.Ptr2 = nil
@@ -468,7 +502,9 @@ func SyscallSysGetpid() (pid int) {
 	syscall := syscallabi.GetGoroutineLocalSyscall()
 	syscall.Trampoline = trampolineSysGetpid
 	syscall.OS = linuxOS
+	logSyscallInvoke("SysGetpid", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysGetpid", syscall)
 	pid = int(syscall.R0)
 	return
 }
@@ -487,7 +523,9 @@ func SyscallSysGetrandom(buf []byte, flags int) (n int, err error) {
 	syscall.OS = linuxOS
 	syscall.Ptr0, syscall.Int0 = unsafe.SliceData(buf), uintptr(len(buf))
 	syscall.Int1 = uintptr(flags)
+	logSyscallInvoke("SysGetrandom", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysGetrandom", syscall)
 	n = int(syscall.R0)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	syscall.Ptr0 = nil
@@ -512,7 +550,9 @@ func SyscallSysGetsockname(fd int, rsa *RawSockaddrAny, addrlen *Socklen) (err e
 	syscall.Int0 = uintptr(fd)
 	syscall.Ptr1 = rsa
 	syscall.Ptr2 = addrlen
+	logSyscallInvoke("SysGetsockname", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysGetsockname", syscall)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	syscall.Ptr1 = nil
 	syscall.Ptr2 = nil
@@ -539,7 +579,9 @@ func SyscallSysGetsockopt(s int, level int, name int, val unsafe.Pointer, vallen
 	syscall.Int2 = uintptr(name)
 	syscall.Ptr3 = val
 	syscall.Ptr4 = vallen
+	logSyscallInvoke("SysGetsockopt", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysGetsockopt", syscall)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	syscall.Ptr3 = nil
 	syscall.Ptr4 = nil
@@ -565,7 +607,9 @@ func SyscallSysListen(s int, n int) (err error) {
 	syscall.OS = linuxOS
 	syscall.Int0 = uintptr(s)
 	syscall.Int1 = uintptr(n)
+	logSyscallInvoke("SysListen", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysListen", syscall)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	return
 }
@@ -587,7 +631,9 @@ func SyscallSysLseek(fd int, offset int64, whence int) (off int64, err error) {
 	syscall.Int0 = uintptr(fd)
 	syscall.Int1 = uintptr(offset)
 	syscall.Int2 = uintptr(whence)
+	logSyscallInvoke("SysLseek", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysLseek", syscall)
 	off = int64(syscall.R0)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	return
@@ -611,7 +657,9 @@ func SyscallSysMadvise(b []byte, advice int) (err error) {
 	syscall.OS = linuxOS
 	syscall.Ptr0, syscall.Int0 = unsafe.SliceData(b), uintptr(len(b))
 	syscall.Int1 = uintptr(advice)
+	logSyscallInvoke("SysMadvise", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysMadvise", syscall)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	syscall.Ptr0 = nil
 	return
@@ -634,7 +682,9 @@ func SyscallSysMkdirat(dirfd int, path string, mode uint32) (err error) {
 	syscall.Int0 = uintptr(dirfd)
 	syscall.Ptr1 = path
 	syscall.Int2 = uintptr(mode)
+	logSyscallInvoke("SysMkdirat", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysMkdirat", syscall)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	syscall.Ptr1 = nil
 	return
@@ -661,7 +711,9 @@ func SyscallSysMmap(addr uintptr, length uintptr, prot int, flags int, fd int, o
 	syscall.Int3 = uintptr(flags)
 	syscall.Int4 = uintptr(fd)
 	syscall.Int5 = uintptr(offset)
+	logSyscallInvoke("SysMmap", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysMmap", syscall)
 	xaddr = uintptr(syscall.R0)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	return
@@ -688,7 +740,9 @@ func SyscallSysMunmap(addr uintptr, length uintptr) (err error) {
 	syscall.OS = linuxOS
 	syscall.Int0 = uintptr(addr)
 	syscall.Int1 = uintptr(length)
+	logSyscallInvoke("SysMunmap", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysMunmap", syscall)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	return
 }
@@ -711,7 +765,9 @@ func SyscallSysNewfstatat(fd int, path string, stat *Stat_t, flags int) (err err
 	syscall.Ptr1 = path
 	syscall.Ptr2 = stat
 	syscall.Int3 = uintptr(flags)
+	logSyscallInvoke("SysNewfstatat", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysNewfstatat", syscall)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	syscall.Ptr1 = nil
 	syscall.Ptr2 = nil
@@ -738,7 +794,9 @@ func SyscallSysOpenat(dirfd int, path string, flags int, mode uint32) (fd int, e
 	syscall.Ptr1 = path
 	syscall.Int2 = uintptr(flags)
 	syscall.Int3 = uintptr(mode)
+	logSyscallInvoke("SysOpenat", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysOpenat", syscall)
 	fd = int(syscall.R0)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	syscall.Ptr1 = nil
@@ -765,7 +823,9 @@ func SyscallSysPread64(fd int, p []byte, offset int64) (n int, err error) {
 	syscall.Int0 = uintptr(fd)
 	syscall.Ptr1, syscall.Int1 = unsafe.SliceData(p), uintptr(len(p))
 	syscall.Int2 = uintptr(offset)
+	logSyscallInvoke("SysPread64", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysPread64", syscall)
 	n = int(syscall.R0)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	syscall.Ptr1 = nil
@@ -791,7 +851,9 @@ func SyscallSysPwrite64(fd int, p []byte, offset int64) (n int, err error) {
 	syscall.Int0 = uintptr(fd)
 	syscall.Ptr1, syscall.Int1 = unsafe.SliceData(p), uintptr(len(p))
 	syscall.Int2 = uintptr(offset)
+	logSyscallInvoke("SysPwrite64", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysPwrite64", syscall)
 	n = int(syscall.R0)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	syscall.Ptr1 = nil
@@ -816,7 +878,9 @@ func SyscallSysRead(fd int, p []byte) (n int, err error) {
 	syscall.OS = linuxOS
 	syscall.Int0 = uintptr(fd)
 	syscall.Ptr1, syscall.Int1 = unsafe.SliceData(p), uintptr(len(p))
+	logSyscallInvoke("SysRead", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysRead", syscall)
 	n = int(syscall.R0)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	syscall.Ptr1 = nil
@@ -842,7 +906,9 @@ func SyscallSysRenameat(olddirfd int, oldpath string, newdirfd int, newpath stri
 	syscall.Ptr1 = oldpath
 	syscall.Int2 = uintptr(newdirfd)
 	syscall.Ptr3 = newpath
+	logSyscallInvoke("SysRenameat", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysRenameat", syscall)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	syscall.Ptr1 = nil
 	syscall.Ptr3 = nil
@@ -870,7 +936,9 @@ func SyscallSysSetsockopt(s int, level int, name int, val unsafe.Pointer, vallen
 	syscall.Int2 = uintptr(name)
 	syscall.Ptr3 = val
 	syscall.Int4 = uintptr(vallen)
+	logSyscallInvoke("SysSetsockopt", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysSetsockopt", syscall)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	syscall.Ptr3 = nil
 	return
@@ -896,7 +964,9 @@ func SyscallSysSocket(domain int, typ int, proto int) (fd int, err error) {
 	syscall.Int0 = uintptr(domain)
 	syscall.Int1 = uintptr(typ)
 	syscall.Int2 = uintptr(proto)
+	logSyscallInvoke("SysSocket", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysSocket", syscall)
 	fd = int(syscall.R0)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	return
@@ -919,7 +989,9 @@ func SyscallSysUname(buf *Utsname) (err error) {
 	syscall.Trampoline = trampolineSysUname
 	syscall.OS = linuxOS
 	syscall.Ptr0 = buf
+	logSyscallInvoke("SysUname", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysUname", syscall)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	syscall.Ptr0 = nil
 	return
@@ -941,7 +1013,9 @@ func SyscallSysUnlinkat(dirfd int, path string, flags int) (err error) {
 	syscall.Int0 = uintptr(dirfd)
 	syscall.Ptr1 = path
 	syscall.Int2 = uintptr(flags)
+	logSyscallInvoke("SysUnlinkat", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysUnlinkat", syscall)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	syscall.Ptr1 = nil
 	return
@@ -964,7 +1038,9 @@ func SyscallSysWrite(fd int, p []byte) (n int, err error) {
 	syscall.OS = linuxOS
 	syscall.Int0 = uintptr(fd)
 	syscall.Ptr1, syscall.Int1 = unsafe.SliceData(p), uintptr(len(p))
+	logSyscallInvoke("SysWrite", syscall)
 	linuxOS.dispatchSyscall(syscall)
+	logSyscallReturn("SysWrite", syscall)
 	n = int(syscall.R0)
 	err = syscallabi.ErrnoErr(syscall.Errno)
 	syscall.Ptr1 = nil

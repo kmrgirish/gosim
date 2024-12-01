@@ -574,13 +574,21 @@ func writeSyscalls(outputPath string, syscalls []syscallInfo, sysnums map[string
 		ifaceText := fmt.Sprintf("\t%s(%s)%s\n", ifaceName, strings.Join(ifaceArgs, ", "), ifaceRet)
 		ifaces.append(sysName, ifaceText)
 
+		var invokeLog, retLog string
+		if !isMachine {
+			invokeLog = fmt.Sprintf("\tlogSyscallInvoke(%s, syscall)\n", strconv.Quote(ifaceName))
+			retLog = fmt.Sprintf("\tlogSyscallReturn(%s, syscall)\n", strconv.Quote(ifaceName))
+		}
+
 		callerText := "//go:norace\n" +
 			fmt.Sprintf("func %s(%s)%s {\n", "Syscall"+ifaceName, strings.Join(callerArgs, ", "), callerRet) +
 			"\tsyscall := syscallabi.GetGoroutineLocalSyscall()\n" +
 			fmt.Sprintf("\tsyscall.Trampoline = trampoline%s\n", ifaceName) +
 			fmt.Sprintf("\tsyscall.OS = %s\n", osImplName) +
 			prepareCaller +
+			invokeLog +
 			fmt.Sprintf("\t%s.dispatchSyscall(syscall)\n", osImplName) +
+			retLog +
 			parseCallerText +
 			cleanupCallerText +
 			"\treturn\n" +

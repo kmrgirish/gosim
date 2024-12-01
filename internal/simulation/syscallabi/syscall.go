@@ -56,6 +56,7 @@ type Syscall struct {
 
 	Goroutine int
 	PC        uintptr
+	Step      int
 
 	Int0, Int1, Int2, Int3, Int4, Int5 uintptr
 	Ptr0, Ptr1, Ptr2, Ptr3, Ptr4       any

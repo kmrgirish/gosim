@@ -160,9 +160,17 @@ func TestLogTraceSyscall(t *testing.T) {
 	// TODO: include machine etc.?
 	if diff := cmp.Diff(metatesting.SimplifyParsedLog(metatesting.ParseLog(run.LogOutput)), []string{
 		"INFO unsupported syscall unknown (9999) 0 0 0 0 0 0",
+		"INFO invoking SysOpenat",
 		"INFO openat -100 hello 577 420",
+		"INFO SysOpenat returned",
+		"INFO invoking SysFcntl",
+		"INFO SysFcntl returned",
+		"INFO invoking SysWrite",
 		`INFO write 5 5 {"world"}`,
+		"INFO SysWrite returned",
+		"INFO invoking SysClose",
 		"INFO close 5",
+		"INFO SysClose returned",
 	}); diff != "" {
 		t.Error("diff", diff)
 	}

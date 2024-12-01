@@ -23,6 +23,7 @@ type Log struct {
 	Msg         string        `json:"msg"`
 	Source      *Stackframe   `json:"source"`
 	Step        int           `json:"step"`
+	RelatedStep int           `json:"relatedStep"`
 	Stackframes []*Stackframe `json:"stackframes"`
 	Machine     string        `json:"machine"`
 	Goroutine   int           `json:"goroutine"`

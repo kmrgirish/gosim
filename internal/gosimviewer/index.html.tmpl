@@ -42,9 +42,11 @@ a {
         </div>
     </div>
     <div style="width: 50%; display: flex; flex-direction: column;">
-        <div id="source" style="height: 50%; overflow: scroll">
+        <div id="source" style="height: 40%; overflow: scroll">
         </div>
-        <div id="stack" style="height: 50%; overflow: scroll">
+        <div id="stack" style="height: 40%; overflow: scroll">
+        </div>
+        <div id="related" style="height: 20%; overflow: scroll">
         </div>
     </div>
 </div>
@@ -52,10 +54,11 @@ a {
 var curFile = undefined;
 function show(opts) {
     if (opts.index !== undefined) {
-        htmx.ajax("GET", "/stack?index=" + opts.index, "#stack");
+        htmx.ajax("GET", "/related?index=" + opts.index, {target: "#related", source: "#related"});
+        htmx.ajax("GET", "/stack?index=" + opts.index, {target: "#stack", source: "#stack"});
     }
     if (opts.source !== undefined) {
-        htmx.ajax("GET", "/viewer?file=" + encodeURIComponent(opts.source.file) + "&line=" + opts.source.line, "#source");
+        htmx.ajax("GET", "/viewer?file=" + encodeURIComponent(opts.source.file) + "&line=" + opts.source.line, {target: "#source", source: "#source"});
     }
 }
 function scrollTo(file, line) {

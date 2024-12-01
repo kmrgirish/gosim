@@ -23,7 +23,8 @@ import (
 type Server struct {
 	Base string
 
-	Logs []*gosimlog.Log
+	Logs       []*gosimlog.Log
+	LogsByStep map[int]*gosimlog.Log
 }
 
 const timeFormat = "15:04:05.000"
@@ -68,6 +69,22 @@ func filter(logs []*gosimlog.Log, f func(*gosimlog.Log) bool) []*gosimlog.Log {
 		}
 	}
 	return filtered
+}
+
+func (s *Server) orRelated(f func(*gosimlog.Log) bool) func(*gosimlog.Log) bool {
+	return func(l *gosimlog.Log) bool {
+		if f(l) {
+			return true
+		}
+		if l.RelatedStep != 0 {
+			if related, ok := s.LogsByStep[l.RelatedStep]; ok {
+				if f(related) {
+					return true
+				}
+			}
+		}
+		return false
+	}
 }
 
 func (s *Server) Index(w http.ResponseWriter, r *http.Request) {
@@ -117,14 +134,14 @@ func (s *Server) Index(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, fmt.Sprintf("parsing goroutine: %s", err.Error()), http.StatusBadRequest)
 				return
 			}
-			logs = filter(logs, func(l *gosimlog.Log) bool {
+			logs = filter(logs, s.orRelated(func(l *gosimlog.Log) bool {
 				return l.Goroutine == goroutine
-			})
+			}))
 
 		case "machine":
-			logs = filter(logs, func(l *gosimlog.Log) bool {
+			logs = filter(logs, s.orRelated(func(l *gosimlog.Log) bool {
 				return l.Machine == arg
-			})
+			}))
 
 		default:
 			http.Error(w, fmt.Sprintf("unknown kind %q", kind), http.StatusBadRequest)
@@ -169,6 +186,38 @@ func (s *Server) Stack(w http.ResponseWriter, r *http.Request) {
 
 	if err := templates.ExecuteTemplate(w, "stack.html.tmpl", map[string]any{
 		"Log": foundLog,
+	}); err != nil {
+		http.Error(w, fmt.Sprintf("writing template: %s", err.Error()), http.StatusInternalServerError)
+		return
+	}
+}
+
+func (s *Server) Related(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	indexStr := q.Get("index")
+	indexIdx, err := strconv.Atoi(indexStr)
+	if err != nil {
+		// TODO: handle
+	}
+
+	var foundLog *gosimlog.Log
+
+	for _, log := range s.Logs {
+		if indexIdx == log.Index {
+			foundLog = log
+		}
+	}
+
+	var logs []*gosimlog.Log
+	if foundLog != nil {
+		logs = filter(s.Logs, func(l *gosimlog.Log) bool {
+			return l.Step == foundLog.Step || (l.RelatedStep != 0 && l.RelatedStep == foundLog.Step) || (foundLog.RelatedStep != 0 && l.Step == foundLog.RelatedStep)
+		})
+	}
+	// TODO: handle not found
+
+	if err := templates.ExecuteTemplate(w, "related.html.tmpl", map[string]any{
+		"Logs": logs,
 	}); err != nil {
 		http.Error(w, fmt.Sprintf("writing template: %s", err.Error()), http.StatusInternalServerError)
 		return
@@ -233,6 +282,8 @@ func Viewer(logs string) {
 	s := &Server{
 		// TODO: somehow get this from the log (and other packages as well)
 		Base: filepath.Join(gomoddir, gosimtool.OutputDirectory, "translated", cfg.AsDirname()),
+
+		LogsByStep: make(map[int]*gosimlog.Log),
 	}
 
 	f, err := os.ReadFile(logs)
@@ -254,11 +305,15 @@ func Viewer(logs string) {
 		parsed.Index = i
 
 		s.Logs = append(s.Logs, &parsed)
+		if parsed.Step != 0 {
+			s.LogsByStep[parsed.Step] = &parsed
+		}
 	}
 
 	http.HandleFunc("GET /{$}", s.Index)
 	http.HandleFunc("GET /viewer", s.Viewer)
 	http.HandleFunc("GET /stack", s.Stack)
+	http.HandleFunc("GET /related", s.Related)
 
 	log.Printf("running server on :8080")
 	if err := http.ListenAndServe(":8080", nil); err != nil {
