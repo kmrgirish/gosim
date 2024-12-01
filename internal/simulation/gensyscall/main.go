@@ -457,7 +457,7 @@ var _ unsafe.Pointer
 
 `+proxyTexts[pkg].output())
 	}
-	writeFormattedGoFile(path.Join(rootDir, "internal/translate/hooks_"+version+"_"+arch+"_gensyscall.go"), `package translate
+	writeFormattedGoFile(path.Join(rootDir, "internal/translate/hooks_"+version+"_"+arch+"_gen.go"), `package translate
 
 func init() {
 	hooksGensyscall`+uppercase(version)+`ByArch["`+arch+`"] = map[packageSelector]packageSelector{
