@@ -3,9 +3,13 @@ package gosimlog
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"log/slog"
+	"reflect"
 	"runtime"
 	"slices"
+	"strings"
 	"time"
 )
 
@@ -13,6 +17,82 @@ type Stackframe struct {
 	File     string `json:"file"`
 	Function string `json:"function"`
 	Line     int    `json:"line"`
+}
+
+func collectJsonKeys(typ reflect.Type) map[string]int {
+	if typ.Kind() != reflect.Struct {
+		panic("bad kind " + typ.Kind().String())
+	}
+
+	known := make(map[string]int)
+
+	for i := 0; i < typ.NumField(); i++ {
+		field := typ.Field(i)
+		if field.Anonymous {
+			panic("anonymous field " + field.Name)
+		}
+		value, ok := field.Tag.Lookup("json")
+		if !ok {
+			panic("bad struct tag " + field.Tag)
+		}
+		if strings.Contains(value, ",") {
+			panic("bad struct tag value " + value)
+		}
+		known[value] = i
+	}
+
+	return known
+}
+
+func unmarshalWithExtraFields(data []byte, value any, extra *[]UnknownField, known map[string]int) error {
+	reflectValue := reflect.ValueOf(value).Elem()
+	if reflectValue.Kind() != reflect.Struct {
+		return errors.New("expected ptr to struct value")
+	}
+
+	d := json.NewDecoder(bytes.NewReader(data))
+	tok, err := d.Token()
+	if err != nil {
+		return err
+	}
+	if tok != json.Delim('{') {
+		return errors.New("expected {")
+	}
+	for d.More() {
+		tok, err = d.Token()
+		if err != nil {
+			return err
+		}
+		key, ok := tok.(string)
+		if !ok {
+			return fmt.Errorf("expected string key, got %q", tok)
+		}
+		if idx, ok := known[key]; ok {
+			target := reflectValue.Field(idx).Addr().Interface()
+			if err := d.Decode(target); err != nil {
+				return err
+			}
+		} else {
+			var value json.RawMessage
+			if err := d.Decode(&value); err != nil {
+				return err
+			}
+			*extra = append(*extra, UnknownField{Key: key, Value: string(value)})
+		}
+	}
+	tok, err = d.Token()
+	if err != nil {
+		return err
+	}
+	if tok != json.Delim('}') {
+		return errors.New("expected }")
+	}
+	return nil
+}
+
+type UnknownField struct {
+	Key   string
+	Value string
 }
 
 type Log struct {
@@ -29,7 +109,15 @@ type Log struct {
 	Goroutine   int           `json:"goroutine"`
 	TraceKind   string        `json:"traceKind"`
 
-	// map[string]any for extra fields
+	Unknown []UnknownField `json:"-"` // for extra fields
+}
+
+// sync.Once this?
+var knownLogInfo = collectJsonKeys(reflect.TypeFor[Log]())
+
+func (l *Log) UnmarshalJSON(b []byte) error {
+	type Plain Log
+	return unmarshalWithExtraFields(b, (*Plain)(l), &l.Unknown, knownLogInfo)
 }
 
 func ParseLog(logs []byte) []*Log {

@@ -7,6 +7,9 @@
         <a href="#" onclick="show({index: {{ .Index }}, source: {{ .Source }} })">{{ .Source | Source }}</a>
         &gt;
         <pre style="display: inline; text-wrap: wrap;">{{ .Msg }}</pre>
+        {{ range .Unknown }}
+            <pre style="display: inline; text-wrap: wrap;">{{ .Key }}={{ .Value }}</pre>
+        {{ end }}
     </span><br>
 {{ end }}
 {{ if .Truncated }}and more...{{ end }}
