@@ -67,7 +67,10 @@ func (w gosimLogWriter) Write(b []byte) (n int, err error) {
 	return len(b), nil
 }
 
-var logInitialized = false
+var (
+	logInitialized = false
+	logSyscalls    = false
+)
 
 func makeBaseSlogHandler() slog.Handler {
 	var level slog.Level
@@ -105,6 +108,7 @@ func setupSlog(machineLabel string) {
 	slog.SetDefault(slog.New(gosimSlogHandler{inner: handler}).With("machine", machineLabel))
 
 	logInitialized = true
+	logSyscalls = gosimruntime.TraceSyscall.Enabled()
 }
 
 func setupUserspace(gosimOS_ *GosimOS, linuxOS_ *LinuxOS, machineID int, label string) {

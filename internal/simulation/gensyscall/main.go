@@ -576,8 +576,13 @@ func writeSyscalls(outputPath string, syscalls []syscallInfo, sysnums map[string
 
 		var invokeLog, retLog string
 		if !isMachine {
-			invokeLog = fmt.Sprintf("\tsyscallLogger.LogEntry%s(%s)\n", ifaceName, strings.Join(dispatchArgs, ", "))
-			retLog = fmt.Sprintf("\tsyscallLogger.LogExit%s(%s)\n", ifaceName, strings.Join(append(dispatchArgs, dispatchRets...), ", "))
+			invokeLog = "\tif logSyscalls {\n" +
+				"\t\tsyscall.Step = gosimruntime.Step()\n" +
+				fmt.Sprintf("\t\tsyscallLogger.LogEntry%s(%s)\n", ifaceName, strings.Join(dispatchArgs, ", ")) +
+				"\t}\n"
+			retLog = "\tif logSyscalls {\n" +
+				fmt.Sprintf("\t\tsyscallLogger.LogExit%s(%s)\n", ifaceName, strings.Join(append(dispatchArgs, dispatchRets...), ", ")) +
+				"\t}\n"
 		}
 
 		callerText := "//go:norace\n" +
@@ -588,8 +593,8 @@ func writeSyscalls(outputPath string, syscalls []syscallInfo, sysnums map[string
 			prepareCaller +
 			invokeLog +
 			fmt.Sprintf("\t%s.dispatchSyscall(syscall)\n", osImplName) +
-			retLog +
 			parseCallerText +
+			retLog +
 			cleanupCallerText +
 			"\treturn\n" +
 			"}\n\n"
@@ -627,6 +632,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
+	"`+gosimtool.Module+`/gosimruntime"
 	"`+gosimtool.Module+`/internal/simulation/fs"
 	"`+gosimtool.Module+`/internal/simulation/syscallabi"
 )
@@ -639,6 +645,7 @@ var (
 	_ syscall.Errno
 	_ fs.InodeInfo
 	_ unix.Errno
+	_ = gosimruntime.GOOS
 )
 
 // %s is the interface *%s must implement to work

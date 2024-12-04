@@ -17,6 +17,7 @@ import (
 	"unsafe"
 
 	"github.com/jellevandenhooff/gosim/gosimruntime"
+	"github.com/jellevandenhooff/gosim/internal/gosimlog"
 	"github.com/jellevandenhooff/gosim/internal/simulation/fs"
 	"github.com/jellevandenhooff/gosim/internal/simulation/network"
 	"github.com/jellevandenhooff/gosim/internal/simulation/syscallabi"
@@ -76,30 +77,23 @@ func (l *LinuxOS) doShutdown() {
 }
 
 func logf(format string, args ...any) {
-	if logInitialized && gosimruntime.TraceSyscall.Enabled() {
+	if logSyscalls {
 		slog.Info(fmt.Sprintf(format, args...), "traceKind", "syscall")
 	}
 }
 
-//go:norace
 func logSyscallEntry(name string, invocation *syscallabi.Syscall) {
-	if logInitialized && gosimruntime.TraceSyscall.Enabled() {
-		invocation.Step = gosimruntime.Step()
-		slog.Info("invoking "+name, "step", invocation.Step, "traceKind", "syscall")
-	}
+	slog.Info("invoking "+name, "step", invocation.Step, "traceKind", "syscall")
 }
 
-//go:norace
 func logSyscallExit(name string, invocation *syscallabi.Syscall) {
-	if logInitialized && gosimruntime.TraceSyscall.Enabled() {
-		slog.Info(name+" returned", "relatedStep", invocation.Step, "traceKind", "syscall")
-	}
+	slog.Info(name+" returned", "relatedStep", invocation.Step, "traceKind", "syscall")
 }
 
 // logfFor logs the given format and args on the goroutine from the passed
 // invocation.
 func (l *LinuxOS) logfFor(invocation *syscallabi.Syscall, format string, args ...any) {
-	if !logInitialized || !gosimruntime.TraceSyscall.Enabled() {
+	if !logSyscalls {
 		return
 	}
 
@@ -270,7 +264,7 @@ func (l *LinuxOS) SysOpenat(dirfd int, path string, flags int, mode uint32, invo
 	flags &= ^syscall.O_CLOEXEC
 
 	// logf("openat %d %s %d %d", dirfd, path, flags, mode)
-	l.logfFor(invocation, "openat %d %s %d %d", dirfd, path, flags, mode)
+	// l.logfFor(invocation, "openat %d %s %d %d", dirfd, path, flags, mode)
 
 	// TODO: some rules about paths; component length; total length; allow characters?
 	// TODO: check mode
@@ -283,16 +277,16 @@ func (l *LinuxOS) SysOpenat(dirfd int, path string, flags int, mode uint32, invo
 	}
 
 	var flagRead, flagWrite bool
-	if flags&os.O_WRONLY != 0 {
-		if flags&(os.O_RDWR) != 0 {
-			return 0, syscall.EINVAL // XXX?
-		}
+	switch flags & 0x3 {
+	case os.O_WRONLY:
 		flagWrite = true
-	} else if flags&os.O_RDWR != 0 {
+	case os.O_RDWR:
 		flagRead = true
 		flagWrite = true
-	} else {
+	case os.O_RDONLY:
 		flagRead = true
+	default:
+		return 0, syscall.EINVAL // XXX?
 	}
 
 	inode, err := l.machine.filesystem.OpenFile(dirInode, path, flags)
@@ -318,12 +312,56 @@ func (l *LinuxOS) SysOpenat(dirfd int, path string, flags int, mode uint32, invo
 	return fd, nil
 }
 
+func fdAttr(name string, fd int) slog.Attr {
+	switch fd {
+	case _AT_FDCWD:
+		return slog.String(name, "AT_FDCWD")
+	default:
+		return slog.Int(name, fd)
+	}
+}
+
+var openatFlags = &gosimlog.BitflagFormatter{
+	Choices: []gosimlog.BitflagChoice{
+		{
+			Mask: 0x3,
+			Values: map[int]string{
+				syscall.O_RDWR:   "O_RDWR",
+				syscall.O_RDONLY: "O_RDONLY",
+				syscall.O_WRONLY: "O_WRONLY",
+			},
+		},
+	},
+	Flags: []gosimlog.BitflagValue{
+		{
+			Value: syscall.O_TRUNC,
+			Name:  "O_TRUNC",
+		},
+		{
+			Value: syscall.O_CREAT,
+			Name:  "O_CREAT",
+		},
+		{
+			Value: syscall.O_APPEND,
+			Name:  "O_APPEND",
+		},
+		{
+			Value: syscall.O_EXCL,
+			Name:  "O_EXCL",
+		},
+		{
+			Value: syscall.O_CLOEXEC,
+			Name:  "O_CLOEXEC",
+		},
+	},
+}
+
 func (customSyscallLogger) LogEntrySysOpenat(dirfd int, path string, flags int, mode uint32, syscall *syscallabi.Syscall) {
-	logSyscallEntry("SysOpenat", syscall)
+	slog.Info("invoking SysOpenat", fdAttr("dirfd", dirfd), "path", path, "flags", openatFlags.Format(flags), "mode", fmt.Sprintf("%O", mode), "step", syscall.Step, "traceKind", "syscall")
 }
 
 func (customSyscallLogger) LogExitSysOpenat(dirfd int, path string, flags int, mode uint32, syscall *syscallabi.Syscall, fd int, err error) {
-	logSyscallExit("SysOpenat", syscall)
+	slog.Info("SysOpenat returned", "fd", fd, "err", err, "relatedStep", syscall.Step, "traceKind", "syscall")
 }
 
 func (l *LinuxOS) SysRenameat(olddirfd int, oldpath string, newdirfd int, newpath string, invocation *syscallabi.Syscall) error {
@@ -332,8 +370,6 @@ func (l *LinuxOS) SysRenameat(olddirfd int, oldpath string, newdirfd int, newpat
 	if l.shutdown {
 		return syscall.EINVAL
 	}
-
-	l.logfFor(invocation, "renameat %d %s %d %s", olddirfd, oldpath, newdirfd, newpath)
 
 	oldInode, err := l.dirInodeForFd(olddirfd)
 	if err != nil {
@@ -352,6 +388,14 @@ func (l *LinuxOS) SysRenameat(olddirfd int, oldpath string, newdirfd int, newpat
 	}
 
 	return nil
+}
+
+func (customSyscallLogger) LogEntrySysRenameat(olddirfd int, oldpath string, newdirfd int, newpath string, syscall *syscallabi.Syscall) {
+	slog.Info("invoking SysRenameat", fdAttr("olddirfd", olddirfd), "oldpath", oldpath, fdAttr("newdirfd", newdirfd), "newpath", newpath, "step", syscall.Step, "traceKind", "syscall")
+}
+
+func (customSyscallLogger) LogExitSysRenameat(diolddirfd int, oldpath string, newdirfd int, newpath string, syscall *syscallabi.Syscall, err error) {
+	slog.Info("SysRenameat returned", "err", err, "relatedStep", syscall.Step, "traceKind", "syscall")
 }
 
 func (l *LinuxOS) SysGetdents64(fd int, data syscallabi.ByteSliceView, invocation *syscallabi.Syscall) (int, error) {
@@ -936,6 +980,59 @@ func (l *LinuxOS) SysSocket(net, flags, proto int, invocation *syscallabi.Syscal
 	l.files[fd] = &Socket{}
 
 	return fd, nil
+}
+
+var socketNet = &gosimlog.BitflagFormatter{
+	Choices: []gosimlog.BitflagChoice{
+		{
+			Mask: 0xff,
+			Values: map[int]string{
+				syscall.AF_INET: "AF_INET",
+			},
+		},
+	},
+}
+
+var socketFlags = &gosimlog.BitflagFormatter{
+	Choices: []gosimlog.BitflagChoice{
+		{
+			Mask: 0xf,
+			Values: map[int]string{
+				syscall.SOCK_STREAM: "SOCK_STREAM",
+				syscall.SOCK_PACKET: "SOCK_PACKET",
+			},
+		},
+	},
+	Flags: []gosimlog.BitflagValue{
+		{
+			Value: syscall.SOCK_NONBLOCK,
+			Name:  "SOCK_NONBLOCK",
+		},
+		{
+			Value: syscall.SOCK_CLOEXEC,
+			Name:  "SOCK_CLOEXEC",
+		},
+	},
+}
+
+var socketProto = &gosimlog.BitflagFormatter{
+	Choices: []gosimlog.BitflagChoice{
+		{
+			Mask: 0xff,
+			Values: map[int]string{
+				syscall.IPPROTO_IP:   "IPPROTO_IP",
+				syscall.IPPROTO_IPV6: "IPPROTO_IPV6",
+			},
+		},
+	},
+}
+
+func (customSyscallLogger) LogEntrySysSocket(net, flags, proto int, syscall *syscallabi.Syscall) {
+	slog.Info("invoking SysSocket", "net", socketNet.Format(net), "flags", socketFlags.Format(flags), "proto", socketProto.Format(proto), "step", syscall.Step, "traceKind", "syscall")
+}
+
+func (customSyscallLogger) LogExitSysSocket(net, flags, proto int, syscall *syscallabi.Syscall, fd int, err error) {
+	slog.Info("SysOpenat returned", "fd", fd, "err", err, "relatedStep", syscall.Step, "traceKind", "syscall")
 }
 
 func (l *LinuxOS) SysBind(fd int, addrPtr unsafe.Pointer, addrlen Socklen, invocation *syscallabi.Syscall) error {
