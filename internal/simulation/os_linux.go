@@ -82,7 +82,7 @@ func logf(format string, args ...any) {
 }
 
 //go:norace
-func logSyscallInvoke(name string, invocation *syscallabi.Syscall) {
+func logSyscallEntry(name string, invocation *syscallabi.Syscall) {
 	if logInitialized && gosimruntime.TraceSyscall.Enabled() {
 		invocation.Step = gosimruntime.Step()
 		slog.Info("invoking "+name, "step", invocation.Step, "traceKind", "syscall")
@@ -90,7 +90,7 @@ func logSyscallInvoke(name string, invocation *syscallabi.Syscall) {
 }
 
 //go:norace
-func logSyscallReturn(name string, invocation *syscallabi.Syscall) {
+func logSyscallExit(name string, invocation *syscallabi.Syscall) {
 	if logInitialized && gosimruntime.TraceSyscall.Enabled() {
 		slog.Info(name+" returned", "relatedStep", invocation.Step, "traceKind", "syscall")
 	}
@@ -316,6 +316,14 @@ func (l *LinuxOS) SysOpenat(dirfd int, path string, flags int, mode uint32, invo
 	l.files[fd] = f
 
 	return fd, nil
+}
+
+func (customSyscallLogger) LogEntrySysOpenat(dirfd int, path string, flags int, mode uint32, syscall *syscallabi.Syscall) {
+	logSyscallEntry("SysOpenat", syscall)
+}
+
+func (customSyscallLogger) LogExitSysOpenat(dirfd int, path string, flags int, mode uint32, syscall *syscallabi.Syscall, fd int, err error) {
+	logSyscallExit("SysOpenat", syscall)
 }
 
 func (l *LinuxOS) SysRenameat(olddirfd int, oldpath string, newdirfd int, newpath string, invocation *syscallabi.Syscall) error {

@@ -576,8 +576,8 @@ func writeSyscalls(outputPath string, syscalls []syscallInfo, sysnums map[string
 
 		var invokeLog, retLog string
 		if !isMachine {
-			invokeLog = fmt.Sprintf("\tlogSyscallInvoke(%s, syscall)\n", strconv.Quote(ifaceName))
-			retLog = fmt.Sprintf("\tlogSyscallReturn(%s, syscall)\n", strconv.Quote(ifaceName))
+			invokeLog = fmt.Sprintf("\tsyscallLogger.LogEntry%s(%s)\n", ifaceName, strings.Join(dispatchArgs, ", "))
+			retLog = fmt.Sprintf("\tsyscallLogger.LogExit%s(%s)\n", ifaceName, strings.Join(append(dispatchArgs, dispatchRets...), ", "))
 		}
 
 		callerText := "//go:norace\n" +
@@ -602,6 +602,16 @@ func writeSyscalls(outputPath string, syscalls []syscallInfo, sysnums map[string
 			parseDispatchText +
 			"}\n\n"
 		callers.append(sysName, dispatchText)
+
+		if !isMachine {
+			loggerText := fmt.Sprintf("func (baseSyscallLogger) LogEntry%s(%s) {\n", ifaceName, strings.Join(append(callerArgs, "syscall *syscallabi.Syscall"), ", ")) +
+				fmt.Sprintf("\tlogSyscallEntry(%s, syscall)\n", strconv.Quote(ifaceName)) +
+				"}\n\n" +
+				fmt.Sprintf("func (baseSyscallLogger) LogExit%s(%s) {\n", ifaceName, strings.Join(append(append(callerArgs, "syscall *syscallabi.Syscall"), callerRets...), ", ")) +
+				fmt.Sprintf("\tlogSyscallExit(%s, syscall)\n", strconv.Quote(ifaceName)) +
+				"}\n\n"
+			callers.append(sysName, loggerText)
+		}
 	}
 
 	output := ""
@@ -653,17 +663,18 @@ func (os *%s) dispatchSyscall(s *syscallabi.Syscall) {
 
 	if !isMachine {
 		output += `
+
+type baseSyscallLogger struct {}
+type customSyscallLogger struct { baseSyscallLogger }
+var syscallLogger customSyscallLogger
+
 func IsHandledSyscall(trap uintptr) bool {
 	switch (trap) {
 ` + checks.output() + `	default:
 		return false
 	}
 }
-`
-	}
-
-	if !isMachine {
-		output += formatSysnums(sysnums)
+` + formatSysnums(sysnums)
 	}
 
 	writeFormattedGoFile(outputPath, output)
