@@ -22,7 +22,7 @@ a {
             {{ $focus := .Focus }}
             <span style="font-family: monospace">
                 focus: {{ if .Focus }}{{ .Focus }} <a href="#" onclick="setFilter({focus: '' })">all logs</a>{{ else }}all logs{{ end }}</pre>;
-                log level:{{ range .LogLevels }} {{ if eq . $level }}{{ . }}{{ else }}<a href="#" onclick="setFilter({level: {{ . }} })">{{ . }}</a>{{ end }}{{ end }}</pre>;
+                log level:{{ range .LogLevels }} {{ if eq . $level }}{{ . | Level }}{{ else }}<a href="#" onclick="setFilter({level: {{ . }} })">{{ . | Level }}</a>{{ end }}{{ end }}</pre>;
                 <label for="syscalls">syscalls: </label><input id="syscalls" type="checkbox" onclick="setFilter({syscalls: event.target.checked})" {{ if .Syscalls }}checked{{ end }}/>
             </span>
         </div>
@@ -32,7 +32,7 @@ a {
         <span style="min-width: 3em; display: inline-block; text-align: right;">{{ .Step }}</span>
         <span style="min-width: 6em; display: inline-block;"><a href="#" onclick="setFilter({focus: 'machine:{{ .Machine }}'})">{{ .Machine }}</a>/<a href="#" onclick="setFilter({focus: 'goroutine:{{ .Goroutine }}'})">{{.Goroutine}}</a></span>
         {{ .Time | Time }}
-        {{ .Level }}
+        {{ .Level | Level }}
         <a href="#" onclick="show({index: {{ .Index }}, source: {{ .Source }} })">{{ .Source | Source }}</a>
         &gt;
         <span style="white-space-collapse: preserve;">{{ .Msg | ShortValue }}</span>

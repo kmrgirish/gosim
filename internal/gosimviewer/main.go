@@ -5,6 +5,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"html"
 	"html/template"
 	"log"
 	"log/slog"
@@ -28,6 +29,20 @@ type Server struct {
 }
 
 const timeFormat = "15:04:05.000"
+
+var levelColors = map[slog.Level]string{
+	slog.LevelDebug: "gray",
+	slog.LevelInfo:  "green",
+	slog.LevelWarn:  "orange",
+	slog.LevelError: "red",
+}
+
+var formattedLevels = map[slog.Level]string{
+	slog.LevelDebug: "DBG",
+	slog.LevelInfo:  "INF",
+	slog.LevelWarn:  "WRN",
+	slog.LevelError: "ERR",
+}
 
 var funcs = template.FuncMap{
 	"Source": func(frame *gosimlog.Stackframe) (template.HTML, error) {
@@ -55,6 +70,18 @@ var funcs = template.FuncMap{
 	},
 	"Time": func(time time.Time) string {
 		return time.Format(timeFormat)
+	},
+	"Level": func(level slog.Level) template.HTML {
+		color, ok := levelColors[level]
+		if !ok {
+			color = "black"
+		}
+		levelText, ok := formattedLevels[level]
+		if !ok {
+			levelText = html.EscapeString(level.String())
+		}
+
+		return template.HTML(fmt.Sprintf(`<span style="color: %s">%s</span>`, color, levelText))
 	},
 }
 
