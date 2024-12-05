@@ -1247,8 +1247,6 @@ func (l *LinuxOS) SysAccept4(fd int, rsa syscallabi.ValueView[RawSockaddrAny], l
 		return 0, syscall.EINVAL
 	}
 
-	l.logfFor(invocation, "accept %d %d %d", fd, len.Get(), flags)
-
 	if flags != syscall.SOCK_CLOEXEC|syscall.SOCK_NONBLOCK {
 		// XXX: check that flags are CLOEXEC and NONBLOCK (just like sys_socket)
 		return 0, syscall.EINVAL // XXX?
@@ -1286,6 +1284,14 @@ func (l *LinuxOS) SysAccept4(fd int, rsa syscallabi.ValueView[RawSockaddrAny], l
 	}
 
 	return newFd, nil
+}
+
+func (customSyscallLogger) LogEntrySysAccept4(s int, rsa *RawSockaddrAny, addrlen *Socklen, flags int, syscall *syscallabi.Syscall) {
+	logSyscallEntry("SysAccept4", syscall, "fd", s, "flags", socketFlags.Format(flags))
+}
+
+func (customSyscallLogger) LogExitSysAccept4(s int, rsa *RawSockaddrAny, addrlen *Socklen, flags int, syscall *syscallabi.Syscall, fd int, err error) {
+	logSyscallExit("SysAccept4", syscall, addrAttr(unsafe.Pointer(rsa), *addrlen), "err", err)
 }
 
 func (l *LinuxOS) SysGetsockopt(fd int, level int, name int, ptr unsafe.Pointer, outlen syscallabi.ValueView[Socklen], invocation *syscallabi.Syscall) error {
