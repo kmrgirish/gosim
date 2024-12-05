@@ -1101,8 +1101,6 @@ func (l *LinuxOS) SysBind(fd int, addrPtr unsafe.Pointer, addrlen Socklen, invoc
 		return err
 	}
 
-	l.logfFor(invocation, "bind %d %s", fd, addr)
-
 	switch {
 	case addr.Addr().Is4():
 	default:
@@ -1112,6 +1110,23 @@ func (l *LinuxOS) SysBind(fd int, addrPtr unsafe.Pointer, addrlen Socklen, invoc
 	sock.IsBound = true
 	sock.BoundAddr = addr
 	return nil
+}
+
+func addrAttr(addr unsafe.Pointer, addrlen Socklen) slog.Attr {
+	parsedAddr, parseErr := readAddr(addr, addrlen)
+	if parseErr != 0 {
+		return slog.Any("addr", parseErr)
+	} else {
+		return slog.Any("addr", parsedAddr)
+	}
+}
+
+func (customSyscallLogger) LogEntrySysBind(s int, addr unsafe.Pointer, addrlen Socklen, syscall *syscallabi.Syscall) {
+	logSyscallEntry("SysBind", syscall, "fd", s, addrAttr(addr, addrlen))
+}
+
+func (customSyscallLogger) LogExitSysBind(s int, addr unsafe.Pointer, addrlen Socklen, syscall *syscallabi.Syscall, err error) {
+	logSyscallExit("SysBind", syscall, "err", err)
 }
 
 func (l *LinuxOS) SysListen(fd, backlog int, invocation *syscallabi.Syscall) error {
@@ -1326,8 +1341,6 @@ func (l *LinuxOS) SysGetsockname(fd int, rsa syscallabi.ValueView[RawSockaddrAny
 		return syscall.EINVAL
 	}
 
-	l.logfFor(invocation, "getsockname %d %d", fd, len.Get())
-
 	fdInternal, ok := l.files[fd]
 	if !ok {
 		return syscall.EBADFD
@@ -1354,6 +1367,14 @@ func (l *LinuxOS) SysGetsockname(fd int, rsa syscallabi.ValueView[RawSockaddrAny
 	default:
 		return syscall.EBADFD
 	}
+}
+
+func (customSyscallLogger) LogEntrySysGetsockname(fd int, rsa *RawSockaddrAny, addrlen *Socklen, syscall *syscallabi.Syscall) {
+	logSyscallEntry("SysGetsockname", syscall, "fd", fd)
+}
+
+func (customSyscallLogger) LogExitSysGetsockname(fd int, rsa *RawSockaddrAny, addrlen *Socklen, syscall *syscallabi.Syscall, err error) {
+	logSyscallExit("SysGetsockname", syscall, addrAttr(unsafe.Pointer(rsa), *addrlen), "err", err)
 }
 
 func (l *LinuxOS) SysChdir(path string, invocation *syscallabi.Syscall) (err error) {
@@ -1517,8 +1538,6 @@ func (l *LinuxOS) SysConnect(fd int, addrPtr unsafe.Pointer, addrLen Socklen, in
 		return errno
 	}
 
-	l.logfFor(invocation, "connect %d %s", fd, addr)
-
 	switch {
 	case addr.Addr().Is4():
 	default:
@@ -1535,6 +1554,14 @@ func (l *LinuxOS) SysConnect(fd int, addrPtr unsafe.Pointer, addrLen Socklen, in
 
 	// XXX: non blocking now
 	return syscall.EINPROGRESS
+}
+
+func (customSyscallLogger) LogEntrySysConnect(s int, addr unsafe.Pointer, addrlen Socklen, syscall *syscallabi.Syscall) {
+	logSyscallEntry("SysConnect", syscall, addrAttr(addr, addrlen))
+}
+
+func (customSyscallLogger) LogExitSysConnect(s int, addr unsafe.Pointer, addrlen Socklen, syscall *syscallabi.Syscall, err error) {
+	logSyscallExit("SysConnect", syscall, "err", err)
 }
 
 func (l *LinuxOS) SysGetrandom(ptr syscallabi.ByteSliceView, flags int, invocation *syscallabi.Syscall) (int, error) {
