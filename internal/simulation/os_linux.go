@@ -630,6 +630,19 @@ func (l *LinuxOS) SysFallocate(fd int, mode uint32, off int64, len int64, invoca
 	return nil
 }
 
+var lseekWhence = &gosimlog.BitflagFormatter{
+	Choices: []gosimlog.BitflagChoice{
+		{
+			Mask: 0x3,
+			Values: map[int]string{
+				io.SeekCurrent: "SEEK_CUR",
+				io.SeekEnd:     "SEEK_END",
+				io.SeekStart:   "SEEK_SET",
+			},
+		},
+	},
+}
+
 func (l *LinuxOS) SysLseek(fd int, offset int64, whence int, invocation *syscallabi.Syscall) (off int64, err error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -647,7 +660,6 @@ func (l *LinuxOS) SysLseek(fd int, offset int64, whence int, invocation *syscall
 		return 0, syscall.EBADFD
 	}
 
-	l.logfFor(invocation, "lseek %d %d %d", fd, offset, whence)
 	var newPos int64
 
 	switch whence {
@@ -673,6 +685,14 @@ func (l *LinuxOS) SysLseek(fd int, offset int64, whence int, invocation *syscall
 	f.pos = newPos
 
 	return f.pos, nil
+}
+
+func (customSyscallLogger) LogEntrySysLseek(fd int, offset int64, whence int, syscall *syscallabi.Syscall) {
+	logSyscallEntry("SysLseek", syscall, "fd", fd, "offset", offset, "whence", lseekWhence.Format(whence))
+}
+
+func (customSyscallLogger) LogExitSysLseek(fd int, offset int64, whence int, syscall *syscallabi.Syscall, off int64, err error) {
+	logSyscallExit("SysLseek", syscall, "off", off, "err", err)
 }
 
 func (l *LinuxOS) SysPwrite64(fd int, data syscallabi.ByteSliceView, offset int64, invocation *syscallabi.Syscall) (int, error) {
@@ -772,14 +792,28 @@ func (l *LinuxOS) SysFsync(fd int, invocation *syscallabi.Syscall) error {
 
 	l.machine.filesystem.Sync(f.inode)
 
-	l.logfFor(invocation, "fsync %d", fd)
-
 	return nil
+}
+
+func (customSyscallLogger) LogEntrySysFsync(fd int, syscall *syscallabi.Syscall) {
+	logSyscallEntry("SysFsync", syscall, "fd", fd)
+}
+
+func (customSyscallLogger) LogExitSysFsync(fd int, syscall *syscallabi.Syscall, err error) {
+	logSyscallExit("SysFsync", syscall, "err", err)
 }
 
 func (l *LinuxOS) SysFdatasync(fd int, invocation *syscallabi.Syscall) error {
 	// TODO: sync only some subset instead?
 	return l.SysFsync(fd, invocation)
+}
+
+func (customSyscallLogger) LogEntrySysFdatasync(fd int, syscall *syscallabi.Syscall) {
+	logSyscallEntry("SysFdatasync", syscall, "fd", fd)
+}
+
+func (customSyscallLogger) LogExitSysFdatasync(fd int, syscall *syscallabi.Syscall, err error) {
+	logSyscallExit("SysFdatasync", syscall, "err", err)
 }
 
 func fillStat(view syscallabi.ValueView[syscall.Stat_t], in fs.StatResp) {
@@ -929,8 +963,6 @@ func (l *LinuxOS) SysClose(fd int, invocation *syscallabi.Syscall) error {
 		return syscall.EINVAL
 	}
 
-	l.logfFor(invocation, "close %d", fd)
-
 	fdInternal, ok := l.files[fd]
 	if !ok {
 		return syscall.EBADFD
@@ -954,6 +986,14 @@ func (l *LinuxOS) SysClose(fd int, invocation *syscallabi.Syscall) error {
 	delete(l.files, fd)
 
 	return nil
+}
+
+func (customSyscallLogger) LogEntrySysClose(fd int, syscall *syscallabi.Syscall) {
+	logSyscallEntry("SysClose", syscall, "fd", fd)
+}
+
+func (customSyscallLogger) LogExitSysClose(fd int, syscall *syscallabi.Syscall, err error) {
+	logSyscallExit("SysClose", syscall, "err", err)
 }
 
 func (l *LinuxOS) SysSocket(net, flags, proto int, invocation *syscallabi.Syscall) (int, error) {
@@ -1332,6 +1372,14 @@ func (l *LinuxOS) SysChdir(path string, invocation *syscallabi.Syscall) (err err
 	l.workdirInode = newDirinode
 
 	return nil
+}
+
+func (customSyscallLogger) LogEntrySysChdir(path string, syscall *syscallabi.Syscall) {
+	logSyscallEntry("SysChdir", syscall, "path", path)
+}
+
+func (customSyscallLogger) LogExitSysChdir(path string, syscall *syscallabi.Syscall, err error) {
+	logSyscallExit("SysChdir", syscall, "err", err)
 }
 
 func (l *LinuxOS) SysGetcwd(buf syscallabi.SliceView[byte], invocation *syscallabi.Syscall) (n int, err error) {
