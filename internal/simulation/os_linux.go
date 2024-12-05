@@ -82,12 +82,14 @@ func logf(format string, args ...any) {
 	}
 }
 
-func logSyscallEntry(name string, invocation *syscallabi.Syscall) {
-	slog.Info("invoking "+name, "step", invocation.Step, "traceKind", "syscall")
+func logSyscallEntry(name string, invocation *syscallabi.Syscall, attrs ...any) {
+	attrs = append(attrs, "step", invocation.Step, "traceKind", "syscall")
+	slog.Info("call "+name, attrs...)
 }
 
-func logSyscallExit(name string, invocation *syscallabi.Syscall) {
-	slog.Info(name+" returned", "relatedStep", invocation.Step, "traceKind", "syscall")
+func logSyscallExit(name string, invocation *syscallabi.Syscall, attrs ...any) {
+	attrs = append(attrs, "relatedStep", invocation.Step, "traceKind", "syscall")
+	slog.Info("ret  "+name, attrs...)
 }
 
 // logfFor logs the given format and args on the goroutine from the passed
@@ -357,11 +359,11 @@ var openatFlags = &gosimlog.BitflagFormatter{
 }
 
 func (customSyscallLogger) LogEntrySysOpenat(dirfd int, path string, flags int, mode uint32, syscall *syscallabi.Syscall) {
-	slog.Info("invoking SysOpenat", fdAttr("dirfd", dirfd), "path", path, "flags", openatFlags.Format(flags), "mode", fmt.Sprintf("%O", mode), "step", syscall.Step, "traceKind", "syscall")
+	logSyscallEntry("SysOpenat", syscall, fdAttr("dirfd", dirfd), "path", path, "flags", openatFlags.Format(flags), "mode", fmt.Sprintf("%O", mode))
 }
 
 func (customSyscallLogger) LogExitSysOpenat(dirfd int, path string, flags int, mode uint32, syscall *syscallabi.Syscall, fd int, err error) {
-	slog.Info("SysOpenat returned", "fd", fd, "err", err, "relatedStep", syscall.Step, "traceKind", "syscall")
+	logSyscallExit("SysOpenat", syscall, "fd", fd, "err", err)
 }
 
 func (l *LinuxOS) SysRenameat(olddirfd int, oldpath string, newdirfd int, newpath string, invocation *syscallabi.Syscall) error {
@@ -391,11 +393,11 @@ func (l *LinuxOS) SysRenameat(olddirfd int, oldpath string, newdirfd int, newpat
 }
 
 func (customSyscallLogger) LogEntrySysRenameat(olddirfd int, oldpath string, newdirfd int, newpath string, syscall *syscallabi.Syscall) {
-	slog.Info("invoking SysRenameat", fdAttr("olddirfd", olddirfd), "oldpath", oldpath, fdAttr("newdirfd", newdirfd), "newpath", newpath, "step", syscall.Step, "traceKind", "syscall")
+	logSyscallEntry("SysRenameat", syscall, fdAttr("olddirfd", olddirfd), "oldpath", oldpath, fdAttr("newdirfd", newdirfd), "newpath", newpath)
 }
 
 func (customSyscallLogger) LogExitSysRenameat(diolddirfd int, oldpath string, newdirfd int, newpath string, syscall *syscallabi.Syscall, err error) {
-	slog.Info("SysRenameat returned", "err", err, "relatedStep", syscall.Step, "traceKind", "syscall")
+	logSyscallExit("SysRenameat", syscall, "err", err)
 }
 
 func (l *LinuxOS) SysGetdents64(fd int, data syscallabi.ByteSliceView, invocation *syscallabi.Syscall) (int, error) {
@@ -1026,11 +1028,11 @@ var socketProto = &gosimlog.BitflagFormatter{
 }
 
 func (customSyscallLogger) LogEntrySysSocket(net, flags, proto int, syscall *syscallabi.Syscall) {
-	slog.Info("invoking SysSocket", "net", socketNet.Format(net), "flags", socketFlags.Format(flags), "proto", socketProto.Format(proto), "step", syscall.Step, "traceKind", "syscall")
+	logSyscallEntry("SysSocket", syscall, "net", socketNet.Format(net), "flags", socketFlags.Format(flags), "proto", socketProto.Format(proto))
 }
 
 func (customSyscallLogger) LogExitSysSocket(net, flags, proto int, syscall *syscallabi.Syscall, fd int, err error) {
-	slog.Info("SysSocket returned", "fd", fd, "err", err, "relatedStep", syscall.Step, "traceKind", "syscall")
+	logSyscallExit("SysSocket", syscall, "fd", fd, "err", err)
 }
 
 func (l *LinuxOS) SysBind(fd int, addrPtr unsafe.Pointer, addrlen Socklen, invocation *syscallabi.Syscall) error {
@@ -1104,9 +1106,15 @@ func (l *LinuxOS) SysListen(fd, backlog int, invocation *syscallabi.Syscall) err
 	}
 	sock.Listener = listener
 
-	l.logfFor(invocation, "listen %d %d", fd, backlog)
-
 	return nil
+}
+
+func (customSyscallLogger) LogEntrySysListen(s int, n int, syscall *syscallabi.Syscall) {
+	logSyscallEntry("SysListen", syscall, "fd", s, "n", n)
+}
+
+func (customSyscallLogger) LogExitSysListen(s int, n int, syscall *syscallabi.Syscall, err error) {
+	logSyscallExit("SysListen", syscall, "err", err)
 }
 
 func readAddr(addr unsafe.Pointer, addrlen Socklen) (netip.AddrPort, syscall.Errno) {
@@ -1333,8 +1341,6 @@ func (l *LinuxOS) SysGetcwd(buf syscallabi.SliceView[byte], invocation *syscalla
 		return 0, syscall.EINVAL
 	}
 
-	l.logfFor(invocation, "getcwd")
-
 	s, err := l.machine.filesystem.Getpath(l.workdirInode)
 	if err != nil {
 		return 0, err
@@ -1351,6 +1357,14 @@ func (l *LinuxOS) SysGetcwd(buf syscallabi.SliceView[byte], invocation *syscalla
 	return n, nil
 }
 
+func (customSyscallLogger) LogEntrySysGetcwd(buf []byte, syscall *syscallabi.Syscall) {
+	logSyscallEntry("SysGetcwd", syscall, "buflen", len(buf))
+}
+
+func (customSyscallLogger) LogExitSysGetcwd(buf []byte, syscall *syscallabi.Syscall, n int, err error) {
+	logSyscallExit("SysGetcwd", syscall, "buf", string(buf[:n]), "n", n, "err", err)
+}
+
 func (l *LinuxOS) SysMkdirat(dirfd int, path string, mode uint32, invocation *syscallabi.Syscall) (err error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -1358,14 +1372,20 @@ func (l *LinuxOS) SysMkdirat(dirfd int, path string, mode uint32, invocation *sy
 		return syscall.EINVAL
 	}
 
-	l.logfFor(invocation, "mkdirat %d %s %d", dirfd, path, mode)
-
 	dirInode, err := l.dirInodeForFd(dirfd)
 	if err != nil {
 		return err
 	}
 
 	return l.machine.filesystem.Mkdir(dirInode, path)
+}
+
+func (customSyscallLogger) LogEntrySysMkdirat(dirfd int, path string, mode uint32, syscall *syscallabi.Syscall) {
+	logSyscallEntry("SysMkdirat", syscall, fdAttr("dirfd", dirfd), "path", path, "mode", fmt.Sprintf("%O", mode))
+}
+
+func (customSyscallLogger) LogExitSysMkdirat(dirfd int, path string, mode uint32, syscall *syscallabi.Syscall, err error) {
+	logSyscallExit("SysMkdirat", syscall, "err", err)
 }
 
 func (l *LinuxOS) SysGetpeername(fd int, rsa syscallabi.ValueView[RawSockaddrAny], len syscallabi.ValueView[Socklen], invocation *syscallabi.Syscall) error {
