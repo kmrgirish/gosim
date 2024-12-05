@@ -963,8 +963,6 @@ func (l *LinuxOS) SysSocket(net, flags, proto int, invocation *syscallabi.Syscal
 
 	// handle sock_posix func (p *ipStackCapabilities) probe()
 
-	l.logfFor(invocation, "socket %d %d %d", net, flags, proto)
-
 	// ipv4 close on exec non blocking tcp streams ONLY
 	if net != syscall.AF_INET {
 		return 0, syscall.EINVAL // XXX?
@@ -1032,7 +1030,7 @@ func (customSyscallLogger) LogEntrySysSocket(net, flags, proto int, syscall *sys
 }
 
 func (customSyscallLogger) LogExitSysSocket(net, flags, proto int, syscall *syscallabi.Syscall, fd int, err error) {
-	slog.Info("SysOpenat returned", "fd", fd, "err", err, "relatedStep", syscall.Step, "traceKind", "syscall")
+	slog.Info("SysSocket returned", "fd", fd, "err", err, "relatedStep", syscall.Step, "traceKind", "syscall")
 }
 
 func (l *LinuxOS) SysBind(fd int, addrPtr unsafe.Pointer, addrlen Socklen, invocation *syscallabi.Syscall) error {
