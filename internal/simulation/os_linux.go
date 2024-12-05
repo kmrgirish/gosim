@@ -898,6 +898,15 @@ func (l *LinuxOS) SysNewfstatat(dirfd int, path string, statBuf syscallabi.Value
 	return l.SysFstatat(dirfd, path, statBuf, flags, invocation)
 }
 
+var unlinkatFlags = &gosimlog.BitflagFormatter{
+	Flags: []gosimlog.BitflagValue{
+		{
+			Value: _AT_REMOVEDIR,
+			Name:  "AT_REMOVEDIR",
+		},
+	},
+}
+
 func (l *LinuxOS) SysUnlinkat(dirfd int, path string, flags int, invocation *syscallabi.Syscall) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -909,8 +918,6 @@ func (l *LinuxOS) SysUnlinkat(dirfd int, path string, flags int, invocation *sys
 	if err != nil {
 		return err
 	}
-
-	l.logfFor(invocation, "unlinkat %d %s %d", dirfd, path, flags)
 
 	switch flags {
 	case 0:
@@ -926,6 +933,14 @@ func (l *LinuxOS) SysUnlinkat(dirfd int, path string, flags int, invocation *sys
 	default:
 		return syscall.EINVAL
 	}
+}
+
+func (customSyscallLogger) LogEntrySysUnlinkat(dirfd int, path string, flags int, syscall *syscallabi.Syscall) {
+	logSyscallEntry("SysUnlinkat", syscall, fdAttr("dirfd", dirfd), "path", path, "flags", unlinkatFlags.Format(flags))
+}
+
+func (customSyscallLogger) LogExitSysUnlinkat(dirfd int, path string, flags int, syscall *syscallabi.Syscall, err error) {
+	logSyscallExit("SysUnlinkat", syscall, "err", err)
 }
 
 func (l *LinuxOS) SysFtruncate(fd int, n int64, invocation *syscallabi.Syscall) error {
@@ -951,9 +966,15 @@ func (l *LinuxOS) SysFtruncate(fd int, n int64, invocation *syscallabi.Syscall) 
 
 	l.machine.filesystem.Truncate(f.inode, int(n))
 
-	l.logfFor(invocation, "truncate %d %d", fd, n)
-
 	return nil
+}
+
+func (customSyscallLogger) LogEntrySysFtruncate(fd int, length int64, syscall *syscallabi.Syscall) {
+	logSyscallEntry("SysFtruncate", syscall, "fd", fd, "length", length)
+}
+
+func (customSyscallLogger) LogExitSysFtruncate(fd int, length int64, syscall *syscallabi.Syscall, err error) {
+	logSyscallExit("SysFtruncate", syscall, "err", err)
 }
 
 func (l *LinuxOS) SysClose(fd int, invocation *syscallabi.Syscall) error {
