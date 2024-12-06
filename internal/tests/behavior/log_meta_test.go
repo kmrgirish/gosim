@@ -5,6 +5,7 @@ package behavior_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -124,6 +125,19 @@ func TestLogDuringInit(t *testing.T) {
 	}
 }
 
+func formatLogsWithExtra(logs []*gosimlog.Log) []string {
+	// TODO: share this code with prettylog somehow?
+	var lines []string
+	for _, log := range logs {
+		line := fmt.Sprintf("%d %s/%d %s %s", log.Step, log.Machine, log.Goroutine, log.Level, log.Msg)
+		for _, kv := range log.Unknown {
+			line += fmt.Sprintf(" %s=%s", kv.Key, kv.Value)
+		}
+		lines = append(lines, line)
+	}
+	return lines
+}
+
 func TestLogTraceSyscall(t *testing.T) {
 	if race.Enabled {
 		// TODO: repair, which will need a reasonable plan for printing data
@@ -155,20 +169,17 @@ func TestLogTraceSyscall(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// TODO: make sure we check traceKind?
 	// TODO: support snapshotting these logs?
-	// TODO: include machine etc.?
-	if diff := cmp.Diff(metatesting.SimplifyParsedLog(metatesting.ParseLog(run.LogOutput)), []string{
-		"INFO unsupported syscall unknown (9999) 0 0 0 0 0 0",
-		// TODO: check flags
-		"INFO call SysOpenat",
-		"INFO ret  SysOpenat",
-		"INFO call SysFcntl",
-		"INFO ret  SysFcntl",
-		"INFO call SysWrite",
-		"INFO ret  SysWrite",
-		"INFO call SysClose",
-		"INFO ret  SysClose",
+	if diff := cmp.Diff(formatLogsWithExtra(gosimlog.ParseLog(run.LogOutput)), []string{
+		"1 main/4 INFO unsupported syscall unknown (9999) 0 0 0 0 0 0",
+		`2 main/4 INFO call SysOpenat dirfd="AT_FDCWD" path="hello" flags="O_WRONLY|O_TRUNC|O_CREAT|O_CLOEXEC" mode="0o644"`,
+		"3 main/4 INFO ret  SysOpenat fd=5 err=null",
+		"4 main/4 INFO call SysFcntl",
+		"5 main/4 INFO ret  SysFcntl",
+		`6 main/4 INFO call SysWrite fd=5 p="world"`,
+		"7 main/4 INFO ret  SysWrite n=5 err=null",
+		"8 main/4 INFO call SysClose fd=5",
+		"9 main/4 INFO ret  SysClose err=null",
 	}); diff != "" {
 		t.Error("diff", diff)
 	}

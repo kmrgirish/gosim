@@ -92,6 +92,7 @@ func TestLogDuringInit(t *testing.T) {
 
 func TestLogTraceSyscall(t *testing.T) {
 	// should print ENOSYS
+	// TODO: test this with a known number and make it work both on arm64 and amd64
 	syscall.Syscall(9999, 0, 0, 0)
 
 	// should print open, write, close

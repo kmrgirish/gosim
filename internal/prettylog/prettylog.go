@@ -25,6 +25,7 @@ package prettylog
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -225,6 +226,12 @@ func (w Writer) writeFields(evt map[string]interface{}, buf *bytes.Buffer) {
 
 		switch value := evt[field].(type) {
 		case string:
+			if strings.HasPrefix(value, "base64:") {
+				bytes, err := base64.StdEncoding.AppendDecode(nil, []byte(value[len("base64:"):]))
+				if err == nil {
+					value = string(bytes)
+				}
+			}
 			if needsQuote(value) {
 				buf.WriteString(w.formatter.fieldValue(field, strconv.Quote(value)))
 			} else {
