@@ -62,9 +62,12 @@ var funcs = template.FuncMap{
 		return template.HTML(buf.String()), nil
 	},
 	"ShortValue": func(value string) string {
-		if len(value) > 120 {
-			// XXX: make this unicode aware
-			return value[:120]
+		n := 0
+		for idx := range value {
+			n++
+			if n >= 120 {
+				return value[:idx] + "…"
+			}
 		}
 		return value
 	},

@@ -1,11 +1,11 @@
 # running gosim with -simtrace
 exec gosim test -run TestSyscall -simtrace= -v .
 ! stdout 'SysOpenat'
-! stdout 'write'
+! stdout 'SysWrite'
 
 exec gosim test -run TestSyscall -simtrace=syscall -v .
 stdout 'SysOpenat.*hello'
-stdout 'write.*world'
+stdout 'SysWrite.*world'
 
 -- simtrace_test.go --
 package behavior_test
