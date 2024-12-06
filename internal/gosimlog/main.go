@@ -2,6 +2,7 @@ package gosimlog
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"reflect"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -76,6 +78,18 @@ func unmarshalWithExtraFields(data []byte, value any, extra *[]UnknownField, kno
 			var value json.RawMessage
 			if err := d.Decode(&value); err != nil {
 				return err
+			}
+
+			// decode base64 binary in values and make it easier to read
+			// TODO: make this less hacky, it would be nice to support
+			// "types" broadly (time, references to steps/machines/FDs,
+			// binary data, other stuff) and format them nicely
+			const base64Prefix = `"base64:`
+			if len(value) > 0 && bytes.HasPrefix(value, []byte(base64Prefix)) {
+				if maybeBytes, err := base64.StdEncoding.AppendDecode(nil, value[len(base64Prefix):len(value)-1]); err == nil {
+					*extra = append(*extra, UnknownField{Key: key, Value: strconv.QuoteToASCII(string(maybeBytes))})
+					continue
+				}
 			}
 			*extra = append(*extra, UnknownField{Key: key, Value: string(value)})
 		}

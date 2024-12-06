@@ -4,6 +4,7 @@ package simulation
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -90,6 +91,43 @@ func logSyscallEntry(name string, invocation *syscallabi.Syscall, attrs ...any) 
 func logSyscallExit(name string, invocation *syscallabi.Syscall, attrs ...any) {
 	attrs = append(attrs, "relatedStep", invocation.Step, "traceKind", "syscall")
 	slog.Info("ret  "+name, attrs...)
+}
+
+func byteDataAttr(key string, value []byte) slog.Attr {
+	return slog.String(key, "base64:"+base64.StdEncoding.EncodeToString(value))
+}
+
+func fdAttr(name string, fd int) slog.Attr {
+	switch fd {
+	case _AT_FDCWD:
+		return slog.String(name, "AT_FDCWD")
+	default:
+		return slog.Int(name, fd)
+	}
+}
+
+func addrAttr(addr unsafe.Pointer, addrlen Socklen) slog.Attr {
+	parsedAddr, parseErr := readAddr(addr, addrlen)
+	if parseErr != 0 {
+		return slog.Any("addr", parseErr)
+	} else {
+		return slog.Any("addr", parsedAddr)
+	}
+}
+
+func int8ArrayToString(key string, value []int8) slog.Attr {
+	n := 0
+	for i, c := range value {
+		if c == 0 {
+			n = i
+			break
+		}
+	}
+	b := make([]byte, n)
+	for i := range n {
+		b[i] = byte(value[i])
+	}
+	return slog.String(key, string(b))
 }
 
 // logfFor logs the given format and args on the goroutine from the passed
@@ -327,15 +365,6 @@ func (l *LinuxOS) SysOpenat(dirfd int, path string, flags int, mode uint32, invo
 	return fd, nil
 }
 
-func fdAttr(name string, fd int) slog.Attr {
-	switch fd {
-	case _AT_FDCWD:
-		return slog.String(name, "AT_FDCWD")
-	default:
-		return slog.Int(name, fd)
-	}
-}
-
 var openatFlags = &gosimlog.BitflagFormatter{
 	Choices: []gosimlog.BitflagChoice{
 		{
@@ -420,8 +449,6 @@ func (l *LinuxOS) SysGetdents64(fd int, data syscallabi.ByteSliceView, invocatio
 		return 0, syscall.EINVAL
 	}
 
-	l.logfFor(invocation, "getdents64 %d %d", fd, data.Len())
-
 	fdInternal, ok := l.files[fd]
 	if !ok {
 		return 0, syscall.EBADFD
@@ -436,6 +463,7 @@ func (l *LinuxOS) SysGetdents64(fd int, data syscallabi.ByteSliceView, invocatio
 		return 0, nil
 	}
 
+	// TODO: make this iteration work with some kind of pointer
 	entries, err := l.machine.filesystem.ReadDir(f.inode)
 	if err != nil {
 		return 0, syscall.EINVAL // XXX?
@@ -531,9 +559,7 @@ func (l *LinuxOS) SysWrite(fd int, data syscallabi.ByteSliceView, invocation *sy
 	if fd == syscall.Stdout || fd == syscall.Stderr {
 		buf := make([]byte, data.Len())
 		data.Read(buf)
-		// TODO: use a custom machine here?
 
-		// TODO: iterate over buf line-by-line?
 		buf = bytes.TrimSuffix(buf, []byte("\n"))
 
 		var source string
@@ -592,7 +618,7 @@ func (l *LinuxOS) SysWrite(fd int, data syscallabi.ByteSliceView, invocation *sy
 
 func (customSyscallLogger) LogEntrySysWrite(fd int, p []byte, syscall *syscallabi.Syscall) {
 	// TODO: format these []byte attrs nicer: handle both ascii and binary gracefully
-	logSyscallEntry("SysWrite", syscall, "fd", fd, "p", string(p))
+	logSyscallEntry("SysWrite", syscall, "fd", fd, byteDataAttr("p", p))
 }
 
 func (customSyscallLogger) LogExitSysWrite(fd int, p []byte, syscall *syscallabi.Syscall, n int, err error) {
@@ -650,7 +676,7 @@ func (customSyscallLogger) LogEntrySysRead(fd int, p []byte, syscall *syscallabi
 }
 
 func (customSyscallLogger) LogExitSysRead(fd int, p []byte, syscall *syscallabi.Syscall, n int, err error) {
-	logSyscallExit("SysRead", syscall, "n", n, "err", err, "p[:n]", string(p[:n]))
+	logSyscallExit("SysRead", syscall, "n", n, "err", err, byteDataAttr("p", p[:n]))
 }
 
 func (l *LinuxOS) SysFallocate(fd int, mode uint32, off int64, len int64, invocation *syscallabi.Syscall) (err error) {
@@ -781,13 +807,11 @@ func (l *LinuxOS) SysPwrite64(fd int, data syscallabi.ByteSliceView, offset int6
 
 	retn := l.machine.filesystem.Write(f.inode, offset, data)
 
-	l.logfFor(invocation, "writeat %d %d %q %d", fd, retn, data, offset)
-
 	return retn, nil
 }
 
 func (customSyscallLogger) LogEntrySysPwrite64(fd int, p []byte, offset int64, syscall *syscallabi.Syscall) {
-	logSyscallEntry("SysPwrite64", syscall, "fd", fd, "offset", offset, "p", string(p))
+	logSyscallEntry("SysPwrite64", syscall, "fd", fd, "offset", offset, byteDataAttr("p", p))
 }
 
 func (customSyscallLogger) LogExitSysPwrite64(fd int, p []byte, offset int64, syscall *syscallabi.Syscall, n int, err error) {
@@ -817,8 +841,6 @@ func (l *LinuxOS) SysPread64(fd int, data syscallabi.ByteSliceView, offset int64
 
 	retn := l.machine.filesystem.Read(f.inode, offset, data)
 
-	l.logfFor(invocation, "readat %d %d %d", fd, data.Len() /*, data[:retn]*/, offset)
-
 	return retn, nil
 }
 
@@ -827,7 +849,7 @@ func (customSyscallLogger) LogEntrySysPread64(fd int, p []byte, offset int64, sy
 }
 
 func (customSyscallLogger) LogExitSysPread64(fd int, p []byte, offset int64, syscall *syscallabi.Syscall, n int, err error) {
-	logSyscallExit("SysPread64", syscall, "n", n, "err", err, "p[:n]", string(p[:n]))
+	logSyscallExit("SysPread64", syscall, "n", n, "err", err, byteDataAttr("p", p[:n]))
 }
 
 func (l *LinuxOS) SysFsync(fd int, invocation *syscallabi.Syscall) error {
@@ -1212,15 +1234,6 @@ func (l *LinuxOS) SysBind(fd int, addrPtr unsafe.Pointer, addrlen Socklen, invoc
 	return nil
 }
 
-func addrAttr(addr unsafe.Pointer, addrlen Socklen) slog.Attr {
-	parsedAddr, parseErr := readAddr(addr, addrlen)
-	if parseErr != 0 {
-		return slog.Any("addr", parseErr)
-	} else {
-		return slog.Any("addr", parsedAddr)
-	}
-}
-
 func (customSyscallLogger) LogEntrySysBind(s int, addr unsafe.Pointer, addrlen Socklen, syscall *syscallabi.Syscall) {
 	logSyscallEntry("SysBind", syscall, "fd", s, addrAttr(addr, addrlen))
 }
@@ -1490,8 +1503,6 @@ func (l *LinuxOS) SysChdir(path string, invocation *syscallabi.Syscall) (err err
 		return syscall.EINVAL
 	}
 
-	l.logfFor(invocation, "chdir %s", path)
-
 	newDirinode, err := l.machine.filesystem.Getdirinode(l.workdirInode, path)
 	if err != nil {
 		return err
@@ -1685,8 +1696,6 @@ func (l *LinuxOS) SysGetrandom(ptr syscallabi.ByteSliceView, flags int, invocati
 		return 0, syscall.EINVAL
 	}
 
-	l.logfFor(invocation, "getrandom %d %d", ptr.Len(), flags)
-
 	if flags != 0 {
 		return 0, syscall.EINVAL
 	}
@@ -1700,6 +1709,14 @@ func (l *LinuxOS) SysGetrandom(ptr syscallabi.ByteSliceView, flags int, invocati
 		n += m
 	}
 	return n, nil
+}
+
+func (customSyscallLogger) LogEntrySysGetrandom(buf []byte, flags int, syscall *syscallabi.Syscall) {
+	// logSyscallEntry("SysGetrandom", syscall)
+}
+
+func (customSyscallLogger) LogExitSysGetrandom(buf []byte, flags int, syscall *syscallabi.Syscall, n int, err error) {
+	// logSyscallExit("SysGetrandom", syscall)
 }
 
 func (l *LinuxOS) SysGetpid(invocation *syscallabi.Syscall) int {
@@ -1726,21 +1743,6 @@ func (l *LinuxOS) SysUname(buf syscallabi.ValueView[Utsname], invocation *syscal
 	nameArray[n] = 0
 	name.Write(nameArray[:n+1])
 	return nil
-}
-
-func int8ArrayToString(key string, value []int8) slog.Attr {
-	n := 0
-	for i, c := range value {
-		if c == 0 {
-			n = i
-			break
-		}
-	}
-	b := make([]byte, n)
-	for i := range n {
-		b[i] = byte(value[i])
-	}
-	return slog.String(key, string(b))
 }
 
 func (customSyscallLogger) LogEntrySysUname(buf *Utsname, syscall *syscallabi.Syscall) {
