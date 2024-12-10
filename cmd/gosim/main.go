@@ -182,6 +182,7 @@ func main() {
 		logformat := testflags.String("logformat", "pretty", "gosim log formatting: raw|indented|pretty")
 		simtrace := testflags.String("simtrace", "", "set of a comma-separated traces to enable")
 		jsonlogout := testflags.String("jsonlogout", "", "path to a file to write json log to, for use with viewer")
+		seeds := testflags.String("seeds", "1", "a comma separated list of seeds and ranges to run, such as 1,2,10-100,99")
 		testflags.Parse(cmdArgs)
 
 		cfg.Race = *race
@@ -229,6 +230,9 @@ func main() {
 				log.Fatalf("making jsonlogout absolute: %s", err)
 			}
 			args = append(args, "-jsonlogout", abs)
+		}
+		if *seeds != "" {
+			args = append(args, "-seeds", *seeds)
 		}
 
 		cmd := exec.Command(name, args...)
@@ -368,6 +372,7 @@ func main() {
 		race := debugflags.Bool("race", false, "build in -race mode")
 		pkg := debugflags.String("package", "", "package path to debug")
 		test := debugflags.String("test", "", "full test name to debug")
+		seed := debugflags.Int("seed", 1, "seed to debug")
 		step := debugflags.Int("step", 0, "step to break at")
 		headless := debugflags.Bool("headless", false, "run headless for IDE debugging")
 		debugflags.Parse(cmdArgs)
@@ -447,6 +452,7 @@ stepout`)
 			"^"+*test+"$",
 			"-test.v",
 			"-step-breakpoint="+fmt.Sprint(*step),
+			"-seeds="+fmt.Sprint(*seed),
 		)
 
 		cmd := exec.Command(name, flags...)

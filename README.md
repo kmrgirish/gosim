@@ -36,9 +36,10 @@ started with `gosim`, you need to import it in your module:
 To test code with Gosim, write a small a test in a file `simple_test.go` and then run
 it using `go test`:
 ```go
-package example_test
+package examples_test
 
 import (
+	"math/rand"
 	"testing"
 
 	"github.com/jellevandenhooff/gosim"
@@ -46,23 +47,28 @@ import (
 
 func TestGosim(t *testing.T) {
 	t.Logf("Are we in the Matrix? %v", gosim.IsSim())
+	t.Logf("Random: %d", rand.Int())
 }
 ```
 ```
-> go test -v -run TestGosim
+> go test -v -count=1 -run TestGosim
 === RUN   TestGosim
-    simple_test.go:10: Are we in the Matrix? false
---- PASS: TestGosim (0.00s simulated)
+    simple_test.go:11: Are we in the Matrix? false
+    simple_test.go:12: Random: 1225418128470362734
+--- PASS: TestGosim (0.00s)
 PASS
 ok  	example	0.216s
 ```
+The test prints that Gosim is not enabled, and each time the test runs the random number is different.
+
 To run this test with `gosim` instead, replace `go test` with
 `go run github.com/jellevandenhooff/gosim/cmd/gosim test`:
 ```
 > go run github.com/jellevandenhooff/gosim/cmd/gosim test -v -run TestGosim
-=== RUN   TestGosim
-    1 main/4     14:10:03.000 INF example/simple_test.go:11 > Are we in the Matrix? true method=t.Logf
---- PASS: TestGosim (0.00s)
+=== RUN   TestGosim (seed 1)
+    1 main/4     14:10:03.000 INF examples/simple_test.go:12 > Are we in the Matrix? true method=t.Logf
+    2 main/4     14:10:03.000 INF examples/simple_test.go:13 > Random: 811966193383742320 method=t.Logf
+--- PASS: TestGosim (0.00s simulated)
 ok  	translated/example	0.204s
 ```
 The `gosim test` command has flags similar to `go test`. The test output is
@@ -70,7 +76,27 @@ more involved than a normal `go test`. Every log line includes the simulated
 machine and the goroutine that invoked the log to help debug tests running on
 multiple machines.
 
-If running gosim fails with errors about missing `go.sum` entries, run
+The `=== RUN` line includes the test's seed. Each time this test runs with the
+same seed it will output the same random number. To test with different seeds,
+you can pass ranges of seeds to `gosim test`:
+```
+go run github.com/jellevandenhooff/gosim/cmd/gosim test -v -seeds=1-3 -run=TestGosim .
+=== RUN   TestGosim (seed 1)
+    1 main/4     14:10:03.000 INF examples/simple_test.go:12 > Are we in the Matrix? true method=t.Logf
+    2 main/4     14:10:03.000 INF examples/simple_test.go:13 > Random: 811966193383742320 method=t.Logf
+--- PASS: TestGosim (0.00s simulated)
+=== RUN   TestGosim (seed 2)
+    1 main/4     14:10:03.000 INF examples/simple_test.go:12 > Are we in the Matrix? true method=t.Logf
+    2 main/4     14:10:03.000 INF examples/simple_test.go:13 > Random: 5374891573232646577 method=t.Logf
+--- PASS: TestGosim (0.00s simulated)
+=== RUN   TestGosim (seed 3)
+    1 main/4     14:10:03.000 INF examples/simple_test.go:12 > Are we in the Matrix? true method=t.Logf
+    2 main/4     14:10:03.000 INF examples/simple_test.go:13 > Random: 3226404213937589817 method=t.Logf
+--- PASS: TestGosim (0.00s simulated)
+ok  	translated/github.com/jellevandenhooff/gosim/examples	0.254s
+```
+
+If running `gosim` fails with errors about missing `go.sum` entries, run
 `go mod tidy` to update your `go.sum` file.
 
 ## Simulation
@@ -162,7 +188,7 @@ what happens this test is run:
 <!-- TODO: two machines and a bug? -->
 ```
 > go run github.com/jellevandenhooff/gosim/cmd/gosim test -v -run TestMachines
-=== RUN   TestMachines
+=== RUN   TestMachines (seed 1)
     1 server/5   14:10:03.000 INF example/machines_test.go:17 > starting server
     2 main/4     14:10:04.000 INF example/machines_test.go:27 > making a request
     3 server/8   14:10:04.000 INF example/machines_test.go:20 > got a request from 11.0.0.1:10000
@@ -217,7 +243,7 @@ realistic latency and timeouts without development time becoming slow.
 ## Debugging
 Gosim's simulation is deterministic, which means that running a test twice
 will result in the exact same behavior, from randomly generated numbers
-to goroutine concurrency interleavings. That is cool because it means that
+to goroutine concurrency interleavings. That is useful because it means that
 if we see an interesting log after running the program but do not fully
 understand why that log printed a certain value, we can re-run the program
 and see exactly what happened at the moment of printing.

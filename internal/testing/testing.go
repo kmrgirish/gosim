@@ -884,7 +884,7 @@ func (t *T) Run(name string, f func(t *T)) bool {
 	// t.w = indenter{&t.common}
 
 	if t.chatty != nil {
-		t.chatty.Updatef(t.name, "=== RUN   %s\n", t.name)
+		t.chatty.Updatef(t.name, "=== RUN   %s (seed %d)\n", t.name, gosimruntime.Seed())
 	}
 	running.Store(t.name, highPrecisionTimeNow())
 

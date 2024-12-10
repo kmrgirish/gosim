@@ -3,11 +3,13 @@ package gosimruntime
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"maps"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -68,8 +70,35 @@ var supportedFlags = map[string]bool{
 	"test.v":            true,
 }
 
+type seedRange struct {
+	start, end int64
+}
+
+func parseSeeds(seedsStr string) ([]seedRange, error) {
+	var seeds []seedRange
+	for _, rangeStr := range strings.Split(seedsStr, ",") {
+		startStr, endStr, ok := strings.Cut(rangeStr, "-")
+		if !ok {
+			endStr = startStr
+		}
+
+		start, err := strconv.ParseInt(startStr, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("bad start of seed range %q: %v", startStr, err)
+		}
+		end, err := strconv.ParseInt(endStr, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("bad end of seed range %q: %v", endStr, err)
+		}
+
+		seeds = append(seeds, seedRange{start: start, end: end})
+	}
+	return seeds, nil
+}
+
 func TestMain(rt Runtime) {
 	simtrace := flag.String("simtrace", "", "set of comma-separated traces to enable")
+	seedsStr := flag.String("seeds", "1", "comma-separated list of seeds and ranges")
 
 	// TODO: make this flag beter; it won't work with multiple test runs?
 	jsonlogout := flag.String("jsonlogout", "", "path to a file to write json log to, for use with viewer")
@@ -96,7 +125,11 @@ func TestMain(rt Runtime) {
 			log.Fatal(err)
 		}
 
-		seed := int64(1)
+		seeds, err := parseSeeds(*seedsStr)
+		if err != nil {
+			log.Fatalf("parsing -seeds: %s", err)
+		}
+
 		enableTracer := true
 		captureLog := true
 		logLevelOverride := "INFO"
@@ -114,25 +147,30 @@ func TestMain(rt Runtime) {
 			}
 		}
 
-		for _, test := range allTestsSlice {
-			// log.Println("running", test.Name)
-			result := run(func() {
-				ok := rt.TestEntrypoint(match, skip, []Test{
-					test,
-				})
-				if !ok {
-					SetAbortError(ErrTestFailed)
-				}
-			}, seed, enableTracer, captureLog, logLevelOverride, makeConsoleLogger(os.Stderr), []string{})
+		for _, seedRange := range seeds {
+			for seed := seedRange.start; seed <= seedRange.end; seed++ {
+				// TODO: filter list of tests outside since each run call has quite some overhead
+				// for skipped tests.
+				for _, test := range allTestsSlice {
+					result := run(func() {
+						ok := rt.TestEntrypoint(match, skip, []Test{
+							test,
+						})
+						if !ok {
+							SetAbortError(ErrTestFailed)
+						}
+					}, int64(seed), enableTracer, captureLog, logLevelOverride, makeConsoleLogger(os.Stderr), []string{})
 
-			if jsonout != nil {
-				if _, err := jsonout.Write(result.LogOutput); err != nil {
-					log.Fatalf("error writing jsonout: %s", err)
-				}
-			}
+					if jsonout != nil {
+						if _, err := jsonout.Write(result.LogOutput); err != nil {
+							log.Fatalf("error writing jsonout: %s", err)
+						}
+					}
 
-			if result.Failed {
-				outerOk = false
+					if result.Failed {
+						outerOk = false
+					}
+				}
 			}
 		}
 

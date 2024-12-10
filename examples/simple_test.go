@@ -1,11 +1,13 @@
 package examples_test
 
 import (
+	"math/rand"
 	"testing"
 
 	"github.com/jellevandenhooff/gosim"
 )
 
-func TestHello(t *testing.T) {
-	t.Log(gosim.IsSim())
+func TestGosim(t *testing.T) {
+	t.Logf("Are we in the Matrix? %v", gosim.IsSim())
+	t.Logf("Random: %d", rand.Int())
 }

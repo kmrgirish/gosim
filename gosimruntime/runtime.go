@@ -90,6 +90,8 @@ func newMachine(label string) *Machine {
 }
 
 type scheduler struct {
+	seed int64
+
 	goroutines      intrusiveList[*goroutine]
 	runnable        intrusiveList[*goroutine]
 	nextGoroutineID int
@@ -124,6 +126,7 @@ func newScheduler(seed int64, logger logger, checksummer *checksummer, extraenv 
 	rand := mathrand.New(mathrand.NewSource(seed))
 
 	s := &scheduler{
+		seed:            seed,
 		goroutines:      make([]*goroutine, 0, 1024),
 		runnable:        make([]*goroutine, 0, 1024),
 		nextGoroutineID: 1,
@@ -328,6 +331,10 @@ type internalRunResult struct {
 	Failed    bool
 	LogOutput []byte
 	Err       error
+}
+
+func Seed() int64 {
+	return gs.get().seed
 }
 
 func run(f func(), seed int64, enableChecksum bool, captureLog bool, logLevelOverride string, simLogger io.Writer, extraenv []string) internalRunResult {

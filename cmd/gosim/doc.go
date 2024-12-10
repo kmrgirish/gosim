@@ -32,19 +32,24 @@ The -race flag translates all code with the race build tag set.
 
 The 'test' command:
 
-Usage: gosim test [-race] [-run=...] [-v] [packages]
+Usage: gosim test [-race] [-run=...] [-seeds=...] [-v] [packages]
 
 The test command translates and runs tests for the specified packages.  It first
 invokes translate, and then invokes 'go test' on the translated code, passing
 through the -run and -v flags.
 
+The -seeds flag specifies what seeds to run the tests on as a comma-separated
+list of seeds and ranges, such as -seeds=1,2,5-10. The default is -seeds=1.
+
 The 'debug' command:
 
-Usage: gosim debug [-race] [-headless] -package=[package] -test=[test] -step=[step]
+Usage: gosim debug [-race] [-headless] -package=[package] -test=[test] [-seed=...] -step=[step]
 
 The debug command translates and runs a specific test using the delve debugger.
 It first invokes translate, and then runs 'dlv test' on the specific test. The
 -step flag is the step to pause at as seen in the logs from running 'gosim test'.
+
+The -seed flag is the seed to run. The default is -seed=1.
 
 The -headless flag optionally runs delve in headless mode for use with an
 external interface like an IDE.
