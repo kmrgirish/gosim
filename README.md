@@ -1,4 +1,5 @@
 # Gosim: Simulation testing for Go
+[![Go Reference](https://pkg.go.dev/badge/github.com/jellevandenhooff/gosim.svg)](https://pkg.go.dev/github.com/jellevandenhooff/gosim)
 
 Gosim is a simulation testing framework that aims to make it easier to write
 reliable distributed systems code in go. Gosim takes standard go programs and
