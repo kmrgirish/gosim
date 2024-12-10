@@ -307,6 +307,40 @@ Now we can inspect the state of memory to see details that the log line might ha
 "11.0.0.1:10001"
 ```
 
+## Tracing system calls
+Gosim's simulation is at the system call level. To see why a program behaved
+the way it did, Gosim can output detailed logs of all system calls with the
+`-simtrace=syscall` flag:
+```
+> go run github.com/jellevandenhooff/gosim/cmd/gosim test -v -simtrace=syscall -run TestMachines
+=== RUN   TestMachines (seed 1)
+    1 server/5   14:10:03.000 INF examples/machines_test.go:19 > starting server
+    2 server/5   14:10:03.000 INF simulation/os_linux_.go:88 > call SysSocket flags=SOCK_STREAM|SOCK_NONBLOCK|SOCK_CLOEXEC net=AF_INET proto=IPPROTO_IP traceKind=syscall
+    3 server/5   14:10:03.000 INF simulation/os_linux_.go:93 > ret  SysSocket err=null fd=5 relatedStep=2 traceKind=syscall
+    4 server/5   14:10:03.000 INF simulation/os_linux_.go:88 > call SysOpenat dirfd=AT_FDCWD flags=O_RDONLY|O_CLOEXEC mode=0o0 path=/proc/sys/net/core/somaxconn traceKind=syscall
+    5 server/5   14:10:03.000 INF simulation/os_linux_.go:93 > ret  SysOpenat err="no such file or directory" fd=0 relatedStep=4 traceKind=syscall
+    6 server/5   14:10:03.000 INF simulation/os_linux_.go:88 > call SysSetsockopt traceKind=syscall
+    7 server/5   14:10:03.000 INF simulation/os_linux_.go:93 > ret  SysSetsockopt relatedStep=6 traceKind=syscall
+    8 server/5   14:10:03.000 INF simulation/os_linux_.go:88 > call SysBind addr=10.0.0.1:80 fd=5 traceKind=syscall
+    9 server/5   14:10:03.000 INF simulation/os_linux_.go:93 > ret  SysBind err=null relatedStep=8 traceKind=syscall
+...
+   60 main/10    14:10:04.000 INF simulation/os_linux_.go:88 > call SysWrite fd=5 p="GET / HTTP/1.1\r\nHost: 10.0.0.1\r\nUser-Agent: Go-http-client/1.1\r\nAccept-Encoding: gzip\r\n\r\n" traceKind=syscall
+   61 main/9     14:10:04.000 INF simulation/os_linux_.go:93 > ret  SysRead err="resource temporarily unavailable" n=0 p= relatedStep=59 traceKind=syscall
+   62 main/10    14:10:04.000 INF simulation/os_linux_.go:93 > ret  SysWrite err=null n=89 relatedStep=60 traceKind=syscall
+   63 server/8   14:10:04.000 INF simulation/os_linux_.go:88 > call SysRead fd=6 len(p)=4096 traceKind=syscall
+   64 server/8   14:10:04.000 INF simulation/os_linux_.go:93 > ret  SysRead err=null n=89 p="GET / HTTP/1.1\r\nHost: 10.0.0.1\r\nUser-Agent: Go-http-client/1.1\r\nAccept-Encoding: gzip\r\n\r\n" relatedStep=63 traceKind=syscall
+   65 server/8   14:10:04.000 INF examples/machines_test.go:22 > got a request from 11.0.0.1:10000
+   66 server/8   14:10:04.000 INF simulation/os_linux_.go:88 > call SysWrite fd=6 p="HTTP/1.1 200 OK\r\nDate: Wed, 15 Jan 2020 14:10:04 GMT\r\nContent-Length: 33\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nhello from the server! request: 1" traceKind=syscall
+   67 server/11  14:10:04.000 INF simulation/os_linux_.go:88 > call SysRead fd=6 len(p)=1 traceKind=syscall
+   68 server/8   14:10:04.000 INF simulation/os_linux_.go:93 > ret  SysWrite err=null n=150 relatedStep=66 traceKind=syscall
+   69 server/11  14:10:04.000 INF simulation/os_linux_.go:93 > ret  SysRead err="resource temporarily unavailable" n=0 p= relatedStep=67 traceKind=syscall
+   70 main/9     14:10:04.000 INF simulation/os_linux_.go:88 > call SysRead fd=5 len(p)=4096 traceKind=syscall
+   71 main/9     14:10:04.000 INF simulation/os_linux_.go:93 > ret  SysRead err=null n=150 p="HTTP/1.1 200 OK\r\nDate: Wed, 15 Jan 2020 14:10:04 GMT\r\nContent-Length: 33\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nhello from the server! request: 1" relatedStep=70 traceKind=syscall
+   72 server/8   14:10:04.000 INF simulation/os_linux_.go:88 > call SysRead fd=6 len(p)=4096 traceKind=syscall
+   73 main/4     14:10:04.000 INF examples/machines_test.go:43 > hello from the server! request: 1
+```
+Here you can see on step 60 the HTTP GET request being written by the client, and then on step 64 being read by the server.
+
 ## Examples
 
 Gosim can run some sizeable real-world code. In this repository
