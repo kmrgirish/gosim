@@ -11,7 +11,7 @@ import (
 	"github.com/kmrgirish/gosim/internal/simulation/syscallabi"
 )
 
-const defaultTimeout = 10 * time.Minute
+const defaultTimeout = 6 * time.Hour
 
 // GosimOS implements all simulation-level system calls, such as creating
 // machines, messing with the network, etc.
