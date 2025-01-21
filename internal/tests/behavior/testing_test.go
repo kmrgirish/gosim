@@ -10,7 +10,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/jellevandenhooff/gosim"
+	"github.com/kmrgirish/gosim"
 )
 
 // TODO: t.Fail, t.FailNow, log.Fatal, fmt.Print, slog.Log, os.Exit

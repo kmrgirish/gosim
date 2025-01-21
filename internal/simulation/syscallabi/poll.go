@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jellevandenhooff/gosim/gosimruntime"
+	"github.com/kmrgirish/gosim/gosimruntime"
 )
 
 // TODO: clean/change this API?

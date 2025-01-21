@@ -16,8 +16,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jellevandenhooff/gosim/internal/gosimtool"
-	"github.com/jellevandenhooff/gosim/internal/race"
+	"github.com/kmrgirish/gosim/internal/gosimtool"
+	"github.com/kmrgirish/gosim/internal/race"
 )
 
 // copied and modified from go:

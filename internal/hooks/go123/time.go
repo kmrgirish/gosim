@@ -4,8 +4,8 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/jellevandenhooff/gosim/gosimruntime"
-	"github.com/jellevandenhooff/gosim/internal/race"
+	"github.com/kmrgirish/gosim/gosimruntime"
+	"github.com/kmrgirish/gosim/internal/race"
 )
 
 func Time_now() (sec int64, nsec int32, mono int64) {

@@ -5,7 +5,7 @@ package nemesis_test
 import (
 	"testing"
 
-	"github.com/jellevandenhooff/gosim/metatesting"
+	"github.com/kmrgirish/gosim/metatesting"
 )
 
 func TestMetaDeterministic(t *testing.T) {

@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jellevandenhooff/gosim"
-	"github.com/jellevandenhooff/gosim/gosimruntime"
+	"github.com/kmrgirish/gosim"
+	"github.com/kmrgirish/gosim/gosimruntime"
 )
 
 func TestMachineCrash(t *testing.T) {

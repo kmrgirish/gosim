@@ -1,7 +1,7 @@
 package go123
 
 import (
-	"github.com/jellevandenhooff/gosim/gosimruntime"
+	"github.com/kmrgirish/gosim/gosimruntime"
 )
 
 func Sync_runtime_Semacquire(addr *uint32) {

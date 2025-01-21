@@ -16,11 +16,11 @@ import (
 
 	"golang.org/x/mod/modfile"
 
-	"github.com/jellevandenhooff/gosim/internal/race"
+	"github.com/kmrgirish/gosim/internal/race"
 )
 
 const (
-	Module          = "github.com/jellevandenhooff/gosim"
+	Module          = "github.com/kmrgirish/gosim"
 	OutputDirectory = ".gosim"
 )
 

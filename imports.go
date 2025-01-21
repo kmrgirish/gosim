@@ -12,13 +12,13 @@ package gosim
 
 import (
 	// Allow running the CLI.
-	_ "github.com/jellevandenhooff/gosim/cmd/gosim"
+	_ "github.com/kmrgirish/gosim/cmd/gosim"
 
 	// Packages listed in internal/translate.TranslatedRuntimePackages.
-	_ "github.com/jellevandenhooff/gosim/internal/hooks/go123"
-	_ "github.com/jellevandenhooff/gosim/internal/reflect"
-	_ "github.com/jellevandenhooff/gosim/internal/simulation"
-	_ "github.com/jellevandenhooff/gosim/internal/testing"
+	_ "github.com/kmrgirish/gosim/internal/hooks/go123"
+	_ "github.com/kmrgirish/gosim/internal/reflect"
+	_ "github.com/kmrgirish/gosim/internal/simulation"
+	_ "github.com/kmrgirish/gosim/internal/testing"
 
 	// Tools used by gosim. For this repository.
 	_ "github.com/go-task/task/v3/cmd/task"

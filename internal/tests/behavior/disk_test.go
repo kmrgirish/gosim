@@ -15,7 +15,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/sys/unix"
 
-	"github.com/jellevandenhooff/gosim"
+	"github.com/kmrgirish/gosim"
 )
 
 func setupRealDisk(t *testing.T) {

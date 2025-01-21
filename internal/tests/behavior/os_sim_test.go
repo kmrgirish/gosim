@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/jellevandenhooff/gosim"
+	"github.com/kmrgirish/gosim"
 )
 
 func TestMachineHostname(t *testing.T) {

@@ -14,8 +14,8 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/jellevandenhooff/gosim"
-	"github.com/jellevandenhooff/gosim/nemesis"
+	"github.com/kmrgirish/gosim"
+	"github.com/kmrgirish/gosim/nemesis"
 )
 
 func makeAddresses() []string {

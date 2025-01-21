@@ -6,7 +6,7 @@ import (
 	"log"
 	"testing"
 
-	"github.com/jellevandenhooff/gosim/metatesting"
+	"github.com/kmrgirish/gosim/metatesting"
 )
 
 func TestCrashRestartFilesystemPartial(t *testing.T) {

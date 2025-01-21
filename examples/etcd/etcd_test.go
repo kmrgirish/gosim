@@ -14,9 +14,9 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/server/v3/embed"
 
-	"github.com/jellevandenhooff/gosim"
-	"github.com/jellevandenhooff/gosim/examples/etcd"
-	"github.com/jellevandenhooff/gosim/nemesis"
+	"github.com/kmrgirish/gosim"
+	"github.com/kmrgirish/gosim/examples/etcd"
+	"github.com/kmrgirish/gosim/nemesis"
 )
 
 func parseUrls(a ...string) []url.URL {

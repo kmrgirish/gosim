@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/jellevandenhooff/gosim/internal/simulation/bridge"
+	"github.com/kmrgirish/gosim/internal/simulation/bridge"
 )
 
 // TODO: needs to be updated for syscallabi

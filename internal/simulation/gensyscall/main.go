@@ -26,8 +26,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jellevandenhooff/gosim/internal/gosimtool"
-	"github.com/jellevandenhooff/gosim/internal/translate"
+	"github.com/kmrgirish/gosim/internal/gosimtool"
+	"github.com/kmrgirish/gosim/internal/translate"
 )
 
 // findAndReadSources looks up the paths of files in go packages path using `go

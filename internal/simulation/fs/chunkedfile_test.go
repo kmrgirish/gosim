@@ -7,7 +7,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/jellevandenhooff/gosim/internal/simulation/syscallabi"
+	"github.com/kmrgirish/gosim/internal/simulation/syscallabi"
 )
 
 func TestMakeChunks(t *testing.T) {

@@ -1,10 +1,10 @@
 package go123
 
 import (
-	"github.com/jellevandenhooff/gosim/gosimruntime"
-	"github.com/jellevandenhooff/gosim/internal/simulation"
-	"github.com/jellevandenhooff/gosim/internal/simulation/syscallabi"
-	"github.com/jellevandenhooff/gosim/internal/testing"
+	"github.com/kmrgirish/gosim/gosimruntime"
+	"github.com/kmrgirish/gosim/internal/simulation"
+	"github.com/kmrgirish/gosim/internal/simulation/syscallabi"
+	"github.com/kmrgirish/gosim/internal/testing"
 )
 
 func Runtime() gosimruntime.Runtime {

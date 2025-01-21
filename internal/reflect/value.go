@@ -10,7 +10,7 @@ import (
 	"reflect" //gosim:notranslate
 	"unsafe"
 
-	"github.com/jellevandenhooff/gosim/gosimruntime"
+	"github.com/kmrgirish/gosim/gosimruntime"
 )
 
 type wrapKind byte

@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jellevandenhooff/gosim/gosimruntime"
-	"github.com/jellevandenhooff/gosim/internal/simulation/fs"
-	"github.com/jellevandenhooff/gosim/internal/simulation/network"
-	"github.com/jellevandenhooff/gosim/internal/simulation/syscallabi"
+	"github.com/kmrgirish/gosim/gosimruntime"
+	"github.com/kmrgirish/gosim/internal/simulation/fs"
+	"github.com/kmrgirish/gosim/internal/simulation/network"
+	"github.com/kmrgirish/gosim/internal/simulation/syscallabi"
 )
 
 type Machine struct {

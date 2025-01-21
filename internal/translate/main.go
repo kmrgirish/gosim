@@ -18,8 +18,8 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/tools/go/packages"
 
-	"github.com/jellevandenhooff/gosim/internal/gosimtool"
-	"github.com/jellevandenhooff/gosim/internal/translate/cache"
+	"github.com/kmrgirish/gosim/internal/gosimtool"
+	"github.com/kmrgirish/gosim/internal/translate/cache"
 )
 
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")

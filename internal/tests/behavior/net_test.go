@@ -19,8 +19,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/jellevandenhooff/gosim"
-	"github.com/jellevandenhooff/gosim/internal/tests/testpb"
+	"github.com/kmrgirish/gosim"
+	"github.com/kmrgirish/gosim/internal/tests/testpb"
 )
 
 // TODO: at the end of each machine, also check that there are no more running goroutines/events/...?

@@ -7,8 +7,8 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/jellevandenhooff/gosim/gosimruntime"
-	"github.com/jellevandenhooff/gosim/internal/simulation"
+	"github.com/kmrgirish/gosim/gosimruntime"
+	"github.com/kmrgirish/gosim/internal/simulation"
 )
 
 func Syscall_runtime_BeforeFork() {

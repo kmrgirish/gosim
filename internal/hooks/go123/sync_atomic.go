@@ -4,8 +4,8 @@ import (
 	"sync/atomic" //gosim:notranslate
 	"unsafe"
 
-	"github.com/jellevandenhooff/gosim/gosimruntime"
-	"github.com/jellevandenhooff/gosim/internal/race"
+	"github.com/kmrgirish/gosim/gosimruntime"
+	"github.com/kmrgirish/gosim/internal/race"
 )
 
 func maybeAtomicYield() {

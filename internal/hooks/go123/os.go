@@ -1,6 +1,6 @@
 package go123
 
-import "github.com/jellevandenhooff/gosim/gosimruntime"
+import "github.com/kmrgirish/gosim/gosimruntime"
 
 func Os_runtime_args() []string {
 	// TODO: make this configurable / fetch this from the machine API?

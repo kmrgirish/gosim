@@ -10,7 +10,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/jellevandenhooff/gosim"
+	"github.com/kmrgirish/gosim"
 )
 
 // XXX: check errors on all file ops?

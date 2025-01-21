@@ -11,8 +11,8 @@ import (
 
 	"golang.org/x/tools/go/packages"
 
-	"github.com/jellevandenhooff/gosim/internal/gosimtool"
-	"github.com/jellevandenhooff/gosim/internal/translate"
+	"github.com/kmrgirish/gosim/internal/gosimtool"
+	"github.com/kmrgirish/gosim/internal/translate"
 )
 
 // prepareSelftest prepares for running tests in the gosim module.

@@ -18,9 +18,9 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/jellevandenhooff/gosim/internal/gosimtool"
-	"github.com/jellevandenhooff/gosim/internal/gosimviewer"
-	"github.com/jellevandenhooff/gosim/internal/translate"
+	"github.com/kmrgirish/gosim/internal/gosimtool"
+	"github.com/kmrgirish/gosim/internal/gosimviewer"
+	"github.com/kmrgirish/gosim/internal/translate"
 )
 
 //go:embed doc.go

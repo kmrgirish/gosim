@@ -6,9 +6,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/jellevandenhooff/gosim/internal/simulation/fs"
-	"github.com/jellevandenhooff/gosim/internal/simulation/network"
-	"github.com/jellevandenhooff/gosim/internal/simulation/syscallabi"
+	"github.com/kmrgirish/gosim/internal/simulation/fs"
+	"github.com/kmrgirish/gosim/internal/simulation/network"
+	"github.com/kmrgirish/gosim/internal/simulation/syscallabi"
 )
 
 const defaultTimeout = 10 * time.Minute
