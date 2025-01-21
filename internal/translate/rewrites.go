@@ -166,9 +166,15 @@ func (t *packageTranslator) rewriteStdlibEmptyAndLinkname(c *dstutil.Cursor) {
 					} else if strings.HasPrefix(pkg, "gosimnotranslate/") {
 						parts[2] = fmt.Sprintf("%s.%s", strings.TrimPrefix(pkg, "gosimnotranslate/"), name)
 						decl.Decs.Start[i] = strings.Join(parts, " ")
+					} else if r, ok := t.replaceLinkname[packageSelector{Pkg: pkg, Selector: name}]; ok {
+						parts[2] = fmt.Sprintf("%s.%s", r.Pkg, r.Selector)
+						decl.Decs.Start[i] = strings.Join(parts, " ")
 					} else {
 						// TODO: make this fail the build?
 						slog.Error("unknown linkname", "pkg", t.pkgPath, "name", decl.Name.Name, "targetPkg", pkg, "targetName", name)
+						for k, v := range t.replaceLinkname {
+							slog.Info("replaceLinkname", "fromPkg", k.Pkg, "fromSelector", k.Selector, "toPkg", v.Pkg, "toSelector", v.Selector)
+						}
 					}
 				}
 			}

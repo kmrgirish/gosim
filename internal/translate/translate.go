@@ -323,6 +323,7 @@ func translatePackage(args *translatePackageArgs) *TranslatePackageResult {
 			bindspecs: make(map[bindspec]struct{}),
 			maps:      ssaGlobals.readonlyMaps,
 		},
+		replaceLinkname:   replaceLinkname,
 		hooks:             hooks,
 		acceptedLinknames: acceptedgo123Linknames,
 		keepAsmPkgs:       keepAsmPackagesGo123,
@@ -430,6 +431,7 @@ type packageTranslator struct {
 	pkgPath       string
 
 	hooks             map[packageSelector]packageSelector
+	replaceLinkname   map[packageSelector]packageSelector
 	acceptedLinknames map[packageSelector]packageSelector
 	keepAsmPkgs       map[string]bool
 
